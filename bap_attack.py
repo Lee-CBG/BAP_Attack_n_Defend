@@ -11,7 +11,7 @@ import torch
 
 ## Configuration
 config = PPOConfig(
-    model_name="models_gen/checkpoint-1600",
+    model_name="/mnt/disk07/user/pzhang84/generativeTCR/bap_attack/models_gen/checkpoint-1600",
     learning_rate=3e-7, #50x smaller
     batch_size = 128, 
     ppo_epochs = 1,
@@ -27,7 +27,7 @@ config = PPOConfig(
 ## Load pre-trained GPT2 language models
 model = AutoModelForCausalLMWithValueHead.from_pretrained(config.model_name)
 model_ref = AutoModelForCausalLMWithValueHead.from_pretrained(config.model_name)
-tokenizer = GPT2Tokenizer.from_pretrained("models_gen/aa_tokenizer_trained")
+tokenizer = GPT2Tokenizer.from_pretrained("/mnt/disk07/user/pzhang84/generativeTCR/bap_attack/models_gen/aa_tokenizer_trained")
 tokenizer.pad_token = tokenizer.eos_token
 
 
