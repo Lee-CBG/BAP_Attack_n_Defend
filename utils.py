@@ -43,6 +43,8 @@ def save_to_csv_1(epis, tcrs, csv_file_path='tmp_epis_tcrs.csv'):
     data = [{'Epitopes': epi, 'TCRs': tcr} for epi, tcr in zip(epis, tcrs)]
 
     # Write the data to a CSV file
+    if not os.path.exists(csv_file_path.parent):
+        os.mkdir(csv_file_path.parent)
     with open(csv_file_path, mode='w', newline='') as file:
         fieldnames = ['Epitopes', 'TCRs']
         writer = csv.DictWriter(file, fieldnames=fieldnames)
