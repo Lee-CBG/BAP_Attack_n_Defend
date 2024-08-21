@@ -11,7 +11,7 @@ import torch
 from pathlib import Path
 import os,sys
 
-BAP_ATTACK = 'atm-tcr'
+BAP_ATTACK = 'catelmp-mlp'
 CMD_MAP = {'atm-tcr': f'bash -c "source activate atm_tcr && python bap_reward/atm_tcr.py"', 'catelmp-mlp': f'bash -c "source activate tf26 && python rewards_bap.py"'}
 
 cwd = os.getcwd()
@@ -116,8 +116,8 @@ for epoch in tqdm(range(10)):
         special_tokens = ["<PAD>", "<tcr>", "<eotcr>", "[CLS]", "[BOS]", "[MASK]", "[SEP]", "<epi>", "<eoepi>", "$"]
         tcrs = ['WRONGFORMAT' if (not s or any(token in s for token in special_tokens)) else s for s in tcrs]
 
-        save_to_csv_1(epis, tcrs, Path(prefix).joinpath('bap_attack/log/tmp_epis_tcrs.csv'))
-
+        # save_to_csv_1(epis, tcrs, Path(prefix).joinpath(f'bap_attack/log/tmp_epis_tcrs_{BAP_ATTACK}.csv'))
+        save_to_csv_1(epis, tcrs, Path(prefix).joinpath(f'bap_attack/log/tmp_epis_tcrs.csv'))
 
         if BAP_ATTACK in ['catelmp-mlp']:
             embed_command = f'bash -c "source activate torch14_conda && python embedder.py"'
