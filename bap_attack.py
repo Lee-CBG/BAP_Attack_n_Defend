@@ -11,8 +11,11 @@ import torch
 from pathlib import Path
 import os,sys
 
-BAP_ATTACK = 'catelmp-mlp'
-CMD_MAP = {'atm-tcr': f'bash -c "source activate atm_tcr && python bap_reward/atm_tcr.py"', 'catelmp-mlp': f'bash -c "source activate tf26 && python rewards_bap.py"'}
+BAP_ATTACK = 'ergo'
+CMD_MAP = {'atm-tcr': f'bash -c "source activate atm_tcr && python bap_reward/atm_tcr.py"',
+            'catelmp-mlp': f'bash -c "source activate tf26 && python rewards_bap.py"',\
+            'ergo': f'bash -c "source activate pytorch14_conda && python bap_reward/ergo.py"',\
+}
 
 cwd = os.getcwd()
 root_dir = 'attack' # set root repo as 'attack' to accomendate all plugin reward repos
@@ -117,7 +120,7 @@ for epoch in tqdm(range(10)):
         tcrs = ['WRONGFORMAT' if (not s or any(token in s for token in special_tokens)) else s for s in tcrs]
 
         # save_to_csv_1(epis, tcrs, Path(prefix).joinpath(f'bap_attack/log/tmp_epis_tcrs_{BAP_ATTACK}.csv'))
-        save_to_csv_1(epis, tcrs, Path(prefix).joinpath(f'bap_attack/log/tmp_epis_tcrs.csv'))
+        save_to_csv_1(epis, tcrs, Path(prefix).joinpath(f'bap_attack/log/tmp_epis_tcrs_{BAP_ATTACK}.csv'))
 
         if BAP_ATTACK in ['catelmp-mlp']:
             embed_command = f'bash -c "source activate torch14_conda && python embedder.py"'

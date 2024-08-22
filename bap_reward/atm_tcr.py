@@ -1,4 +1,3 @@
-# TODO: check if the token are the same
 import os, sys
 from pathlib import Path
 from dataclasses import dataclass
@@ -83,7 +82,7 @@ score_model = deepcopy(model)
 score_model.net[9] = nn.Identity()
 
 # load generative model acctacks
-data_file = str(Path(prefix).joinpath('bap_attack/log/tmp_epis_tcrs.csv'))
+data_file = str(Path(prefix).joinpath(f'bap_attack/{ATTACK_DATA}'))
 x_pep, x_tcr, bound = local_read_candidateTCR(data_file)
 data_loader = define_dataloader(x_pep, x_tcr, bound, 
                                 maxlen_pep=Args.max_len_pep,
@@ -100,11 +99,13 @@ for batch in data_loader['loader']:
 		# pred = model(X_pep, X_tcr)
 		score = score_model(X_pep, X_tcr)
 	# y_pred.extend(pred.to('cpu').numpy().tolist())
-	y_score.extend(score.to('cpu').numpy().tolist())
+	y_score.extend(score.to('cpu').numpy().squeeze().tolist())
 
 dat1 = pd.read_csv(data_file)
-dat1['yhat'] = y_score
-dat1.to_csv(data_file)
+data_file_output = str(Path(data_file).parent.joinpath(
+     Path(ATTACK_DATA).stem + '_output' + Path(ATTACK_DATA).suffix))
+dat1['yhat_tcr'] = y_score
+dat1.to_csv(data_file_output, index=False)
 yhat_list = np.array(y_score)
 yhat_list.reshape(-1)
 yhat_list = yhat_list.tolist()
