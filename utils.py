@@ -36,8 +36,8 @@ def save_to_csv(datasets, csv_file_path='tmp_epis_tcrs.csv'):
         writer.writeheader()
         for row in data:
             writer.writerow(row)
-            
-            
+
+
 def save_to_csv_1(epis, tcrs, csv_file_path='tmp_epis_tcrs.csv'):
 
     # Create a list of dictionaries for each pair of epis and tcrs
@@ -53,11 +53,16 @@ def save_to_csv_1(epis, tcrs, csv_file_path='tmp_epis_tcrs.csv'):
         writer.writeheader()
         for row in data:
             writer.writerow(row)
-            
-            
+
+
             
 def append_tmp_to_master(tmp_filename='tmp_epis_tcrs.csv', master_filename='all_results.csv'):
 
     master_exists = os.path.isfile(master_filename)
     tmp_df = pd.read_csv(tmp_filename)
     tmp_df.to_csv(master_filename, mode='a', header=not master_exists, index=False)
+
+
+def process_titan():
+    # Change dataset into the TITAN formation.
+    pass

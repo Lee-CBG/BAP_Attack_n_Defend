@@ -11,11 +11,13 @@ import torch
 from pathlib import Path
 import os,sys
 
-BAP_ATTACK = 'ergo'
+BAP_ATTACK = 'titan'
 CMD_MAP = {'atm-tcr': f'bash -c "source activate atm_tcr && python bap_reward/atm_tcr.py"',
-            'catelmp-mlp': f'bash -c "source activate tf26 && python rewards_bap.py"',\
-            'ergo': f'bash -c "source activate pytorch14_conda && python bap_reward/ergo.py"',\
+           'catelmp-mlp': f'bash -c "source activate tf26 && python rewards_bap.py"',\
+           'ergo': f'bash -c "source activate torch14_conda && python bap_reward/ergo.py"',\
+           'titan': f'bash -c "source activate titan && python bap_reward/titan.py"',\
 }
+
 
 cwd = os.getcwd()
 root_dir = 'attack' # set root repo as 'attack' to accomendate all plugin reward repos
@@ -82,8 +84,6 @@ dataset = dataset.map(
 )
 dataset = dataset.map(lambda x: {"query": tokenizer.decode(x["input_ids"])}, batched=False)
 ppo_trainer = PPOTrainer(config, model, model_ref, tokenizer, dataset=dataset, data_collator=collator)
-
-
 
 
 generation_kwargs = {

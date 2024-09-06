@@ -15,7 +15,7 @@ Fix prefix at 'attack' level to accomendate all plugin reward repos.
 """
 
 
-REWARD_MODEL = 'models/model_repTCR.ckpt'
+REWARD_MODEL = 'models/atm_tcr-tcr.ckpt'
 ATTACK_DATA = 'log/tmp_epis_tcrs_atm-tcr.csv'
 # dummy args
 @dataclass
@@ -99,13 +99,16 @@ for batch in data_loader['loader']:
 		# pred = model(X_pep, X_tcr)
 		score = score_model(X_pep, X_tcr)
 	# y_pred.extend(pred.to('cpu').numpy().tolist())
-	y_score.extend(score.to('cpu').numpy().squeeze().tolist())
+	y_score.extend(score.to('cpu').numpy().tolist())
 
 dat1 = pd.read_csv(data_file)
 data_file_output = str(Path(data_file).parent.joinpath(
-     Path(ATTACK_DATA).stem + '_output' + Path(ATTACK_DATA).suffix))
-dat1['yhat_tcr'] = y_score
-dat1.to_csv(data_file_output, index=False)
+     Path(ATTACK_DATA).stem + f'{Path(REWARD_MODEL).stem}_output' + Path(ATTACK_DATA).suffix))
+dat1['yhat'] = y_score
+if not os.path.exists(data_file_output):
+	dat1.to_csv(data_file_output, index=False, mode='w')
+else:
+     dat1.to_csv(data_file_output, header= False, index=False, mode='a')
 yhat_list = np.array(y_score)
 yhat_list.reshape(-1)
 yhat_list = yhat_list.tolist()

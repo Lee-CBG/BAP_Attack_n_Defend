@@ -15,11 +15,11 @@ Fix prefix at 'attack' level to accomendate all plugin reward repos.
 """
 
 
-REWARD_MODEL = 'models/test_epitope_model.pt'
+REWARD_MODEL = 'models/ergo_epitope_lstm_model.pt'
 ATTACK_DATA = 'log/tmp_epis_tcrs_ergo.csv'
 # dummy args
 class Args:
-    model_type: str = 'ae' # 'lstm' or 'ae'
+    model_type: str = 'lstm' # 'lstm' or 'ae'
     batch_size: int = 50
     lstm_dim: int = 500
     emb_dim: int = 10
@@ -78,7 +78,7 @@ elif Args.model_type == 'lstm':
     from ERGO_models import DoubleLSTMClassifier as classifier
     amino_to_ix = {amino: index for index, amino in enumerate(['PAD'] + amino_acids)}
     from ERGO import lstm_get_lists_from_pairs as get_lists_from_pairs
-    tcrs, peps, signs = get_lists_from_pairs(pair, Args.max_len)
+    tcrs, peps, signs = get_lists_from_pairs(pair)
     model_utils.convert_data(tcrs, peps, amino_to_ix)
     test_batches = model_utils.get_full_batches(tcrs, peps, signs, Args.batch_size, amino_to_ix)
     model = classifier(10, 500, 0.1, device)
@@ -98,15 +98,17 @@ model.to(device)
 score_model = deepcopy(model)
 score_model.act = nn.Identity()
 
-
-y_score = model_utils.predict(model, test_batches, device)
+y_score = model_utils.predict(score_model, test_batches, device)
 
 dat1 = pd.read_csv(data_file)
 data_file_output = str(Path(data_file).parent.joinpath(
-     Path(ATTACK_DATA).stem + '_output' + Path(ATTACK_DATA).suffix))
-dat1['yhat_ergo'] = y_score
-dat1.to_csv(data_file_output, index=False)
-yhat_list = np.array(y_score)
+     Path(ATTACK_DATA).stem +  f'{Path(REWARD_MODEL).stem}_output' + Path(ATTACK_DATA).suffix))
+dat1['yhat'] = np.array(y_score)[:,np.newaxis].tolist()
+if not os.path.exists(data_file_output):
+	dat1.to_csv(data_file_output, index=False, mode='w')
+else:
+    dat1.to_csv(data_file_output, header= False, index=False, mode='a')
+yhat_list = np.array(y_score)[:,np.newaxis]
 yhat_list.reshape(-1)
 yhat_list = yhat_list.tolist()
 json_output = json.dumps(yhat_list)

@@ -1,4 +1,9 @@
 log/
 models_gen/
+backup_model/
+batch_collector/
 __pycache__/
 *.whl
+.vscode/
+backup_model/
+backup_data/
