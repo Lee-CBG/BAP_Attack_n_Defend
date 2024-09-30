@@ -16,7 +16,8 @@ Fix prefix at 'attack' level to accomendate all plugin reward repos.
 
 
 REWARD_MODEL = 'models/atm_tcr-tcr.ckpt'
-ATTACK_DATA = 'log/tmp_epis_tcrs_atm-tcr.csv'
+# ATTACK_DATA = 'log/tmp_epis_tcrs_atm-tcr.csv'
+ATTACK_DATA = 'metrics/dat_benchmarking.csv'
 # dummy args
 @dataclass
 class Args:
@@ -84,6 +85,7 @@ score_model.net[9] = nn.Identity()
 # load generative model acctacks
 data_file = str(Path(prefix).joinpath(f'bap_attack/{ATTACK_DATA}'))
 x_pep, x_tcr, bound = local_read_candidateTCR(data_file)
+bound = np.zeros(len(x_pep))
 data_loader = define_dataloader(x_pep, x_tcr, bound, 
                                 maxlen_pep=Args.max_len_pep,
                                 maxlen_tcr=Args.max_len_tcr,
@@ -102,6 +104,9 @@ for batch in data_loader['loader']:
 	y_score.extend(score.to('cpu').numpy().tolist())
 
 dat1 = pd.read_csv(data_file)
+
+
+
 data_file_output = str(Path(data_file).parent.joinpath(
      Path(ATTACK_DATA).stem + f'{Path(REWARD_MODEL).stem}_output' + Path(ATTACK_DATA).suffix))
 dat1['yhat'] = y_score

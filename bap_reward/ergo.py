@@ -15,11 +15,14 @@ Fix prefix at 'attack' level to accomendate all plugin reward repos.
 """
 
 
-REWARD_MODEL = 'models/ergo_epitope_lstm_model.pt'
+# REWARD_MODEL = 'models/ergo_epitope_lstm_model.pt'
+REWARD_MODEL = 'models/ergo_tcr_ae_model.pt'
+
 ATTACK_DATA = 'log/tmp_epis_tcrs_ergo.csv'
+# ATTACK_DATA = 'metrics/dat_benchmarking.csv'
 # dummy args
 class Args:
-    model_type: str = 'lstm' # 'lstm' or 'ae'
+    model_type: str = 'ae' # 'lstm' or 'ae'
     batch_size: int = 50
     lstm_dim: int = 500
     emb_dim: int = 10
@@ -69,6 +72,12 @@ if Args.model_type == 'ae':
     from ERGO import ae_get_lists_from_pairs as get_lists_from_pairs
     pep_atox = {amino: index for index, amino in enumerate(['PAD'] + amino_acids)}
     tcr_atox = {amino: index for index, amino in enumerate(amino_acids + ['X'])}
+    # need to tylar sequence to the same length    
+    pair = [list(i) for i in pair]
+    for i in range(len(pair)):
+        if len(pair[i][0]) >= Args.max_len-1:
+             pair[i][0] = pair[i][0][:Args.max_len-1]
+    pair = [tuple(i) for i in pair]
     tcrs, peps, signs = get_lists_from_pairs(pair, Args.max_len)
     test_batches = model_utils.get_full_batches(tcrs, peps, signs, tcr_atox, pep_atox, Args.batch_size, Args.max_len)
     model = classifier(10, device, 28, 21, 100, 50, str(Path(prefix).joinpath('ERGO').joinpath(Args.ae_file)), False)

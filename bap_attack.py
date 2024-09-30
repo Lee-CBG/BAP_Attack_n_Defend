@@ -11,7 +11,7 @@ import torch
 from pathlib import Path
 import os,sys
 
-BAP_ATTACK = 'titan'
+BAP_ATTACK = 'ergo'
 CMD_MAP = {'atm-tcr': f'bash -c "source activate atm_tcr && python bap_reward/atm_tcr.py"',
            'catelmp-mlp': f'bash -c "source activate tf26 && python rewards_bap.py"',\
            'ergo': f'bash -c "source activate torch14_conda && python bap_reward/ergo.py"',\
@@ -26,22 +26,21 @@ sys.path.append(prefix)
 
 ## Configuration
 config = PPOConfig(
-    # model_name="/mnt/disk07/user/pzhang84/generativeTCR/bap_attack/models_gen/checkpoint-1600",
-    model_name = str(Path(prefix).joinpath('bap_attack/models_gen/checkpoint-1600')),
-    learning_rate=3e-7, #50x smaller
-    batch_size = 128, 
-    ppo_epochs = 1,
-    adap_kl_ctrl = False,
-    init_kl_coef = 1.2,
-    steps = 5,
+    model_name=str(Path(prefix).joinpath('/mnt/disk07/user/pzhang84/generativeTCR/bap_attack/models_gen/checkpoint-1600')),
+    learning_rate=1e-4,  # higher learning rate for better exploration
+    batch_size=64,  # Smaller batch size for more frequent updates
+	mini_batch_size=64,
+    gradient_accumulation_steps=1,
+    ppo_epochs=8,  # More epochs to better refine the policy in each iteration
+    adap_kl_ctrl=False,  # Disable adaptive KL control
+    init_kl_coef=0,  # Disable the KL divergence penalty
+    cliprange=0.3,  # increase cliprange to allow larger updates
 )
-# wandb.init(config=config, )
-
 
 ## Load pre-trained GPT2 language models
 model = AutoModelForCausalLMWithValueHead.from_pretrained(config.model_name)
 model_ref = AutoModelForCausalLMWithValueHead.from_pretrained(config.model_name)
-tokenizer = GPT2Tokenizer.from_pretrained(str(Path(prefix).joinpath('bap_attack/models_gen/aa_tokenizer_trained')))
+tokenizer = GPT2Tokenizer.from_pretrained(str(Path(prefix).joinpath('/mnt/disk07/user/pzhang84/generativeTCR/bap_attack/models_gen/aa_tokenizer_trained')))
 tokenizer.pad_token = tokenizer.eos_token
 
 
@@ -99,10 +98,11 @@ generation_kwargs = {
 
 
 ## Reward hacking
+i = 0
 for epoch in tqdm(range(10)):
     for batch in tqdm(ppo_trainer.dataloader):
         query_tensors = batch["input_ids"]
-
+        i += 1
         #### Get response from gpt2 scratch (conda: trl)
         response_tensors = []
         for query in tqdm(query_tensors):
@@ -116,11 +116,11 @@ for epoch in tqdm(range(10)):
         print('Start embedding')
         epis = [tokenizer.decode(r.squeeze())[:-2] for r in query_tensors]
         tcrs = [response.split('<EOS>')[0] for response in batch["response"]]
-        special_tokens = ["<PAD>", "<tcr>", "<eotcr>", "[CLS]", "[BOS]", "[MASK]", "[SEP]", "<epi>", "<eoepi>", "$"]
-        tcrs = ['WRONGFORMAT' if (not s or any(token in s for token in special_tokens)) else s for s in tcrs]
+        special_tokens = ["<PAD>", "<tcr>", "<eotcr>", "[CLS]", "[BOS]", "[MASK]", "[SEP]", "<epi>", "<eoepi>", "$", '<unk>']
 
+        tcrs_r = ['WRONGFORMAT' if (not s or any(token in s for token in special_tokens)) else s for s in tcrs]
         # save_to_csv_1(epis, tcrs, Path(prefix).joinpath(f'bap_attack/log/tmp_epis_tcrs_{BAP_ATTACK}.csv'))
-        save_to_csv_1(epis, tcrs, Path(prefix).joinpath(f'bap_attack/log/tmp_epis_tcrs_{BAP_ATTACK}.csv'))
+        save_to_csv_1(epis, tcrs_r, i, Path(prefix).joinpath(f'bap_attack/log/tmp_epis_tcrs_{BAP_ATTACK}.csv'))
 
         if BAP_ATTACK in ['catelmp-mlp']:
             embed_command = f'bash -c "source activate torch14_conda && python embedder.py"'
@@ -137,7 +137,7 @@ for epoch in tqdm(range(10)):
         rewards_bap = [torch.tensor(value[0], dtype=torch.float32) for value in rewards_data]
 
         rewards = rewards_bap
-        append_tmp_to_master()
+        # append_tmp_to_master()
 
         #### Run PPO step
         stats = ppo_trainer.step(query_tensors, response_tensors, rewards)
@@ -145,7 +145,3 @@ for epoch in tqdm(range(10)):
     
     print(f'\nEpoch {epoch}:')
     print(tcrs[:20]) # data peek
-
-    
-    
-    

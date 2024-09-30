@@ -38,16 +38,16 @@ def save_to_csv(datasets, csv_file_path='tmp_epis_tcrs.csv'):
             writer.writerow(row)
 
 
-def save_to_csv_1(epis, tcrs, csv_file_path='tmp_epis_tcrs.csv'):
+def save_to_csv_1(epis, tcrs, iter,csv_file_path='tmp_epis_tcrs.csv'):
 
     # Create a list of dictionaries for each pair of epis and tcrs
-    data = [{'Epitopes': epi, 'TCRs': tcr} for epi, tcr in zip(epis, tcrs)]
+    data = [{'Epitopes': epi, 'TCRs': tcr, 'Iter': iter} for epi, tcr in zip(epis, tcrs)]
 
     # Write the data to a CSV file
     if not os.path.exists(csv_file_path.parent):
         os.mkdir(csv_file_path.parent)
     with open(csv_file_path, mode='w', newline='') as file:
-        fieldnames = ['Epitopes', 'TCRs']
+        fieldnames = ['Epitopes', 'TCRs', 'Iter']
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         
         writer.writeheader()

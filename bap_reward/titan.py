@@ -17,7 +17,7 @@ Fix prefix at 'attack' level to accomendate all plugin reward repos.
 
 REWARD_MODEL = '/owndata/owndata/weights/best_ROC-AUC_bimodal_mca.pt'
 ATTACK_DATA = 'log/tmp_epis_tcrs_titan.csv'
-
+# ATTACK_DATA = 'metrics/dat_benchmarking.csv'
 
 cwd = os.getcwd()
 root_dir = 'attack'
