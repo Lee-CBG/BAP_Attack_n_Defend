@@ -7,3 +7,6 @@ __pycache__/
 .vscode/
 backup_model/
 backup_data/
+data_bap/
+outputs/
+result/

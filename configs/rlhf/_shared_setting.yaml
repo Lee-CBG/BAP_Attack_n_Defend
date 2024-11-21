@@ -1,0 +1,11 @@
+
+defaults:
+  - rl_model:  ppo
+
+dir:  /home/hmei7/workspace/tcr/models_gen
+rounds: 2
+
+FILE: 
+  RM: ${rlhf.dir}/checkpoint-reward
+  LM: ${rlhf.dir}/checkpoint-1600
+  TKN: ${rlhf.dir}/aa_tokenizer_trained

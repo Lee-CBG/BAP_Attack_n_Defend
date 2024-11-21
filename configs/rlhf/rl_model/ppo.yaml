@@ -1,0 +1,29 @@
+name: ppo
+
+configs:
+  learning_rate: 1e-4  # higher learning rate for better exploration
+  batch_size: 64  # Smaller batch size for more frequent updates
+  mini_batch_size: 64
+  gradient_accumulation_steps: 1
+  ppo_epochs: 8  # More epochs to better refine the policy in each iteration
+  adap_kl_ctrl: True  # Disable adaptive KL control
+  init_kl_coef: 1e-2  # Disable the KL divergence penalty
+  cliprange: 0.3  # increase cliprange to allow larger updates
+
+generation_kwargs:
+  min_length: -1 # don't ignore the EOS token
+  top_k: 0.0 # no top-k sampling
+  top_p: 1.0 # no nucleus sampling
+  do_sample: True # yes, we want to sample
+  max_length: 72
+  num_return_sequences: 1
+
+
+comparison_kwargs:
+  temperature: 1.2
+  min_length: -1 # don't ignore the EOS token
+  top_k: 0.0 # no top-k sampling
+  top_p: 1.0 # no nucleus sampling
+  do_sample: True # yes, we want to sample
+  max_length: 72
+  num_return_sequences: ${rlhf.K}

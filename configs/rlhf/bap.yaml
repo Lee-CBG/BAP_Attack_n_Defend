@@ -1,0 +1,6 @@
+defaults:
+  - _self_
+  - _shared_setting
+
+name: bap
+

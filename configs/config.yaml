@@ -1,0 +1,8 @@
+defaults:
+  - _self_
+  - rlhf: bap
+  - attack: titan
+
+
+project_name: BAP enhancement with RHLF
+run_name: ${attack.name}-${rlhf.name}

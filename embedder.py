@@ -9,6 +9,7 @@ from tqdm import tqdm
 parser = argparse.ArgumentParser()
 parser.add_argument('--epi', type=str)
 parser.add_argument('--n_seq', type=int, default=100)
+parser.add_argument('--pad', type=bool, default=True)
 args = parser.parse_args()
 
 model_dir = Path('/mnt/disk07/user/pzhang84/ELMo/ablation_pretraining/pretraining_4_layers_1024')
@@ -23,9 +24,26 @@ def ELMo_embeds(x):
         # Handle the case where x is a float
         return [0.0] * 1024  # Return a default value (list of zeros) or take another appropriate action
     else:
-        return torch.tensor(embedder.embed_sentence(list(x))).sum(dim=0).mean(dim=0).tolist()
+        if args.pad:
+            return torch.tensor(embedder.embed_sentence(list(x))).mean(dim=0).tolist()
+        else:
+            return torch.tensor(embedder.embed_sentence(list(x))).sum(dim=0).mean(dim=0).tolist()
 
-dat1 = pd.read_csv(f'tmp_epis_tcrs.csv')
+
+def padding_helper(seq, padded_len=22):
+    if len(seq) >= padded_len:
+        seq = seq[:padded_len]
+    else:
+        suf = [0] * 1024
+        while len(seq) < padded_len:
+            seq.append(suf)
+    return seq
+
+
+if args.pad:
+	dat1 = pd.read_csv(f'./log/tmp_epis_tcrs_pite.csv')
+else:
+	dat1 = pd.read_csv(f'./log/tmp_epis_tcrs_catelmp-mlp.csv')
 dat1['tcr_embeds'] = None
 dat1['epi_embeds'] = None
 
@@ -33,4 +51,13 @@ for index, row in tqdm(dat1.iterrows(), total=dat1.shape[0]):
     dat1.at[index, 'tcr_embeds'] = ELMo_embeds(row['TCRs'])
     dat1.at[index, 'epi_embeds'] = ELMo_embeds(row['Epitopes'])
 
-dat1.to_pickle(f"tmp_epis_tcrs.pkl")
+# pad trainValid
+if args.pad:
+  for i in tqdm(range(len(dat1))):
+    dat1.tcr_embeds[i] = padding_helper(dat1.tcr_embeds[i])
+    dat1.epi_embeds[i] = padding_helper(dat1.epi_embeds[i])
+
+if args.pad:
+	dat1.to_pickle(f"./log/tmp_epis_tcrs_pite.pkl")
+else:
+     dat1.to_pickle(f"./log/tmp_epis_tcrs_catelmp-mlp.pkl")
