@@ -6,7 +6,7 @@ from trl import PPOTrainer, PPOConfig, AutoModelForCausalLMWithValueHead, create
 
 from trl.core import LengthSampler
 from tqdm import tqdm
-from utils import save_to_csv, override_csv
+from utils.data_utils import save_to_csv, override_csv
 import pandas as pd
 import subprocess
 import json
@@ -21,8 +21,8 @@ import hydra
 
 from torch.optim.lr_scheduler import LambdaLR
 from omegaconf import DictConfig, OmegaConf
-from rlhf_utils import create_PreferenceDB, create_ScoreQuery, create_RewardInferene, tabula_rasa_RMDataset, lookup_best_reward
-from rlhf import create_ppo_config
+from utils.rlhf_utils import create_PreferenceDB, create_ScoreQuery, create_RewardInferene, tabula_rasa_RMDataset, lookup_best_reward
+from utils.rlhf import create_ppo_config
 
 
 # os.environ['WANDB_PROJECT'] = 'RLHF4TCRGen'
@@ -35,9 +35,10 @@ sys.path.append(prefix)
 
 LOG_DIR = str(FILE_PATH.joinpath('log'))
 CMD_MAP = {'atm-tcr': f'bash -c "source activate atm_tcr && python {prefix}/bap_attack/bap_reward/atm_tcr.py"',
-       'catelmp-mlp': f'bash -c "source activate tf26 && python rewards_bap.py"',\
+       'catelmp-mlp': f'bash -c "source activate tf26 && python bap_rewards/pite.py"',\
        'ergo': f'bash -c "source activate torch14_conda && python bap_reward/ergo.py"',\
        'titan': f'conda run -n titan python {prefix}/bap_attack/bap_reward/titan.py',\
+	   'pite': f'conda run -n tf26 python bap_reward/pite.py',\
 }
 SPECIAL_TOKENS = ["<PAD>", "<tcr>", "<eotcr>", "[CLS]", "[BOS]", "[MASK]", "[SEP]", "<epi>", "<eoepi>", "$", '<unk>']
 
@@ -112,7 +113,8 @@ def main(cfg: DictConfig):
 					print(f'Working Step2:\t Generating Prefrence Score from BAP:{cfg.attack.name}...')
 					# TODO: check embedding later
 					if cfg.attack.name in ['catelmp-mlp, pite']:
-						embed_command = f'bash -c "source activate torch14_conda && python embedder.py"'
+						pad =  True if cfg.attack.name == 'pite' else False
+						embed_command = f'conda run -n torch14_conda python embedder.py --pad {pad} --folder result'
 						embed_process = subprocess.Popen(embed_command, shell=True, stdout=subprocess.PIPE)
 						embed_process.communicate()
 					reward_command = CMD_MAP[cfg.attack.name] + ' data_bap'
@@ -159,6 +161,15 @@ def main(cfg: DictConfig):
 	else: 
 		raise NameError('Invalid RLHF name')
 
+	# Integrate wandb
+	if wandb.run:
+		wandb_cfg = OmegaConf.to_container(cfg.wandb)
+		cfg = OmegaConf.merge(cfg, wandb_cfg)
+		
+		wandb.init(project=cfg.project, name=cfg.run_name, config=OmegaConf.to_container(cfg))
+	
+		
+	print(f'{len(ppo_trainer.dataloader)} BATCHS in each EPOCH\n')
 	# start LM and RM model tunning
 	for epoch in tqdm(range(rlhf_settings.rounds)):
 		for batch in ppo_trainer.dataloader:
@@ -181,10 +192,11 @@ def main(cfg: DictConfig):
 				info = {'Epitopes': [p[0] for p in pairs], 'TCRs': [p[1] for p in pairs], 'Rewards': [round(r.item(),4) for r in reward_tensors]}
 				save_to_csv(info, rd, FILE_PATH.joinpath(f'result/attack_{cfg.attack.name}.csv'))
 
+
 				# Generate bap score (as reference)
 				if cfg.attack.name in ['catelmp-mlp', 'pite']:
 					pad =  True if cfg.attack.name == 'pite' else False
-					embed_command = f'bash -c "source activate torch14_conda && python embedder.py --pad {pad}"'
+					embed_command = f'conda run -n torch14_conda python embedder.py --pad {pad} --folder result'
 					embed_process = subprocess.Popen(embed_command, shell=True, stdout=subprocess.PIPE)
 					embed_process.communicate()
 
@@ -195,7 +207,8 @@ def main(cfg: DictConfig):
 				# update RM
 				lm_generation(ppo_trainer, tokenizer, rlhf_settings, FILE_PATH.joinpath(f'tmp/attack_{cfg.attack.name}.csv'), rd)
 				if cfg.attack.name in ['catelmp-mlp']:
-					embed_command = f'bash -c "source activate torch14_conda && python embedder.py'
+					pad =  True if cfg.attack.name == 'pite' else False
+					embed_command = f'conda run -n torch14_conda python embedder.py --pad {pad} --folder result'
 					embed_process = subprocess.Popen(embed_command, shell=True, stdout=subprocess.PIPE)
 					embed_process.communicate()
 				reward_command = CMD_MAP[cfg.attack.name] + ' tmp'
@@ -207,7 +220,6 @@ def main(cfg: DictConfig):
 				reward_Trainer.train()
 				# remove tmp log directory
 				# os.rmdir(str(FILE_PATH.joinpath('tmp')))
-
 			elif rlhf_settings.name == 'bap':
 				# update LM
 				info = {'Epitopes': [p[0] for p in pairs], 'TCRs': [p[1] for p in pairs]}
@@ -216,7 +228,7 @@ def main(cfg: DictConfig):
 				override_csv(info, rd, FILE_PATH.joinpath(f'result/attack_{cfg.attack.name}.csv'))
 				if cfg.attack.name in ['catelmp-mlp', 'pite']:
 					pad =  True if cfg.attack.name == 'pite' else False
-					embed_command = f'bash -c "source activate torch14_conda && python embedder.py --pad {pad}"'
+					embed_command = f'conda run -n torch14_conda python embedder.py --pad {pad} --folder result'
 					embed_process = subprocess.Popen(embed_command, shell=True, stdout=subprocess.PIPE)
 					embed_process.communicate()
 				reward_command = CMD_MAP[cfg.attack.name] + ' result'
@@ -225,16 +237,18 @@ def main(cfg: DictConfig):
 				rewards_data = json.loads(rewards_json)
 				reward_tensors = [torch.tensor(value[0], dtype=torch.float32) for value in rewards_data]
 				stats = ppo_trainer.step(query_tensors, response_tensors, reward_tensors)
+				wandb.log({
+						'iteration': rd,
+						# 'loss': stats['loss'],
+						'reward': reward_tensors/len(reward_tensors)})
 				# ppo_trainer.log_stats(stats, batch, eward_tensors.detach().numpy())
-
-
 			else:
 				raise NameError('Invalid RLHF name')
 			
 			rd+=1
 
 		print(f'\nEpoch {epoch}:')		
-
+	wandb.finish()
 
 if __name__ == '__main__':
 	main()

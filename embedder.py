@@ -10,14 +10,22 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--epi', type=str)
 parser.add_argument('--n_seq', type=int, default=100)
 parser.add_argument('--pad', type=bool, default=True)
+parser.add_argument('--folder', type=str, default='data_bap')
 args = parser.parse_args()
 
-model_dir = Path('/mnt/disk07/user/pzhang84/ELMo/ablation_pretraining/pretraining_4_layers_1024')
+
+DEVICE = -1
+model_dir = Path('/home/hmei7/workspace/tcr/attack/pite/pretraining_4_layers_1024')
 weights = model_dir/'weights.hdf5'
 options = model_dir/'options.json'
-embedder  = ElmoEmbedder(options,weights,cuda_device=1) # cuda_device=-1 for CPU
+embedder  = ElmoEmbedder(options,weights,cuda_device=DEVICE) # cuda_device=-1 for CPU
 #GeForce RTX 3080 with CUDA capability sm_86 is not compatible with the current PyTorch installation.
 #So cuda_device can be -1 or 1 and 2. But cannot be 0.
+FILE_PATH = os.path.dirname(os.path.abspath(__file__))
+root_dir = 'attack'
+prefix = str(FILE_PATH)[:(str(FILE_PATH).find(root_dir)+len(root_dir))] if str(FILE_PATH).find(root_dir)!=-1 else str(FILE_PATH)+f'/{root_dir}' # in case cwd is below root_dir level
+ATTACK_DATA = Path(prefix).joinpath(f'bap_attack/bap_attack/attack_pite.pkl')
+
 
 def ELMo_embeds(x):
     if isinstance(x, float):
@@ -41,9 +49,9 @@ def padding_helper(seq, padded_len=22):
 
 
 if args.pad:
-	dat1 = pd.read_csv(f'./log/tmp_epis_tcrs_pite.csv')
+	dat1 = pd.read_csv(Path(prefix).joinpath(f'bap_attack/{args.folder}/attack_pite.csv'))
 else:
-	dat1 = pd.read_csv(f'./log/tmp_epis_tcrs_catelmp-mlp.csv')
+	dat1 = pd.read_csv(Path(prefix).joinpath(f'bap_attack/{args.folder}/attack_catelmp-mlp.csv'))
 dat1['tcr_embeds'] = None
 dat1['epi_embeds'] = None
 
@@ -58,6 +66,6 @@ if args.pad:
     dat1.epi_embeds[i] = padding_helper(dat1.epi_embeds[i])
 
 if args.pad:
-	dat1.to_pickle(f"./log/tmp_epis_tcrs_pite.pkl")
+	dat1.to_pickle(Path(prefix).joinpath(f'bap_attack/{args.folder}/attack_pite.pkl'))
 else:
-     dat1.to_pickle(f"./log/tmp_epis_tcrs_catelmp-mlp.pkl")
+     dat1.to_pickle(Path(prefix).joinpath(f'bap_attack/{args.folder}/attack_catelmp-mlp.pkl'))

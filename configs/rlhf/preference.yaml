@@ -14,4 +14,4 @@ reward_config:
   max_length: 72
   gradient_accumulation_steps: 8
   num_train_epochs: 1
-  report_to: wandb  
+  report_to: wandb
