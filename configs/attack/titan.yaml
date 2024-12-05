@@ -1,2 +1,5 @@
-name: titan
+defaults:
+  - _self_
+  - _shared_setting
 
+name: titan

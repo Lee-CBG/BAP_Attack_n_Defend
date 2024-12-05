@@ -1,9 +1,5 @@
-from trl import PPOTrainer, PPOConfig, AutoModelForCausalLMWithValueHead, create_reference_model, RewardTrainer, RewardConfig
-import ast
-
-
-def _eval_kwargs(kwargs):
-	return {k: abs.v for k, v in kwargs.items() if v is not None}
+from trl import PPOConfig
+from evaluator import gpt_ll, tcr_match
 
 
 def create_ppo_config(name, configs):
@@ -19,3 +15,13 @@ def create_ppo_config(name, configs):
     	cliprange=configs.cliprange,  # increase cliprange to allow larger updates
 		)
 	return ppo_config
+
+def eval_filter(folder, bap, **kwargs):
+	flag = False
+	if kwargs.get('gpt_ll'):
+		gpt_ll.evaluate(folder, bap)
+		flag = True
+	if kwargs.get('tcr_match'):
+		tcr_match.evaluate(folder, bap)
+		flag = True
+	return flag

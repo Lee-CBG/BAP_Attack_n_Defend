@@ -1,8 +1,11 @@
 defaults:
   - _self_
   - rlhf: bap
-  - attack: pite
+  - attack: atmTCR
 
+data_split: 'tcr'
+augment_rounds: 2
+output_dir: experiments
 
 project_name: BAP enhancement with RHLF
 run_name: ${attack.name}-${rlhf.name}

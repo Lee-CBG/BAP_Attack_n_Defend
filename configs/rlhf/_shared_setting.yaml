@@ -5,6 +5,7 @@ defaults:
 dir:  /home/hmei7/workspace/tcr/models_gen
 rounds: 2
 
+
 FILE: 
   RM: ${rlhf.dir}/checkpoint-reward
   LM: ${rlhf.dir}/checkpoint-1600
