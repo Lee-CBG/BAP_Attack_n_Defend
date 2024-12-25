@@ -10,3 +10,5 @@ outputs/
 backup_list/
 model_list/
 *.ipynb
+logs/
+*.out

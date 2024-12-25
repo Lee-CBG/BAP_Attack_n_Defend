@@ -3,7 +3,7 @@ defaults:
   - rl_model:  ppo
 
 dir:  /home/hmei7/workspace/tcr/models_gen
-rounds: 2
+generation_rounds: 2
 
 
 FILE: 

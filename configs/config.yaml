@@ -1,11 +1,13 @@
 defaults:
   - _self_
   - rlhf: bap
-  - attack: atmTCR
+  - attack: pite
 
 data_split: 'tcr'
-augment_rounds: 2
-output_dir: experiments
+augment_rounds: 4
+# output_dir: ${eval:"'${hydra:runtime.output_dir}'.replace('${hydra:runtime.cwd}', '')[:-1]"}
+output_dir: ${hydra:runtime.output_dir}
+base_dir: ${hydra:runtime.cwd}
 
 project_name: BAP enhancement with RHLF
 run_name: ${attack.name}-${rlhf.name}

@@ -3,7 +3,7 @@ defaults:
   - _shared_setting
 
 name: atmTCR
-retrain_model: model_list/atmTCR_ratrain.ckpt
-retrain_data: data/tcr_split
+model_suffix: ckpt
 
-default_model: backup_list/atm_tcr-tcr.ckpt
+retrain_model: ${attack.model_dir}/${attack.name}_${data_split}_retrain.${attack.model_suffix}
+retrain_data: data/tcr_split

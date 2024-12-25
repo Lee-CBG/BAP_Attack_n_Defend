@@ -3,4 +3,7 @@ defaults:
   - _shared_setting
 
 name: pite
+model_suffix: keras
 
+retrain_model: ${attack.model_dir}/${attack.name}_${data_split}_retrain_checkpoint.${attack.model_suffix}
+retrain_data: data/tcr_split

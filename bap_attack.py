@@ -19,24 +19,26 @@ from utils.rlhf_utils import create_PreferenceDB, create_ScoreQuery, create_Rewa
 from utils.rlhf import create_ppo_config, eval_filter
 from itertools import islice
 
+import warnings
+warnings.filterwarnings("ignore")
+
 
 # os.environ['WANDB_PROJECT'] = 'RLHF4TCRGen'
-# os.environ["CUDA_VISIBLE_DEVICES"]="0"
-DEVICE = 'cuda:0'
+DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 FILE_PATH = Path(os.path.dirname(os.path.abspath(__file__)))
 root_dir = 'attack' # set root repo as 'attack' to accomendate all plugin reward repos
 prefix = str(FILE_PATH)[:(str(FILE_PATH).find(root_dir)+len(root_dir))] if str(FILE_PATH).find(root_dir)!=-1 else str(FILE_PATH)+f'/{root_dir}' # in case cwd is below root_dir level
 sys.path.append(prefix)
 
-LOG_DIR = str(FILE_PATH.joinpath('log'))
-CMD_MAP = {'atmTCR': f'bash -c "source activate atm-tcr && python {prefix}/bap_attack/bap_reward/atmTCR_infer.py"',
+LOG_DIR = str(FILE_PATH.joinpath('logs'))
+CMD_MAP = {'atmTCR': f'conda run -n atm-tcr python bap_reward/atmTCR_infer.py',
 	   'catelmp-mlp': f'bash -c "source activate tf26 && python bap_rewards/pite.py"',\
 	   'ergo': f'bash -c "source activate torch14_conda && python bap_reward/ergo.py"',\
-	   'titan': f'conda run -n titan python {prefix}/bap_attack/bap_reward/titan.py',\
-	   'pite': f'conda run -n tf26 python bap_reward/pite.py',\
+	   'titan': f'conda run -n titan python bap_attack/bap_reward/titan.py',\
+	   'pite': f'conda run -n tf26 python bap_reward/pite_infer.py',\
 	   'embedder': f'conda run -n torch14_conda python bap_reward/embedder.py',\
 }
-TRAIN_MAP = {'pite': f'conda run -n tf26 python bap_train/train_pite.py',\
+TRAIN_MAP = {'pite': f'conda run -n tf26 python bap_train/pite_train.py',\
 			 'atmTCR': f'conda run -n atm-tcr python bap_train/atmTCR_train.py',\
 }
 SPECIAL_TOKENS = ["<PAD>", "<tcr>", "<eotcr>", "[CLS]", "[BOS]", "[MASK]", "[SEP]", "<epi>", "<eoepi>", "$", '<unk>']
@@ -67,7 +69,7 @@ def lm_generation(trainer, tokenizer, kwargs, data_Path, round, init=False):
 
 def rlhf_init(cfg, ppo_trainer, tokenizer):
 	rlhf_settings = cfg.rlhf
-	
+
 	if not os.path.exists(rlhf_settings.FILE.RM):
 		# Initialize reward model from scratch
 		print('Checking Step4:\t No Reward model found...\n')
@@ -138,35 +140,36 @@ def rlhf_init(cfg, ppo_trainer, tokenizer):
 def bap_init(cfg):
 	# retrain bap_model if its not saved at model_dir
 	if OmegaConf.is_missing(cfg.attack, 'retrain_model'):
-		model_file = f'{cfg.attack.name}_retrain.ckpt'
+		model_file = f'{cfg.attack.name}_{cfg.data_split}_retrain'
 	else:
 		model_file = cfg.attack.retrain_model
 	if not os.path.exists(FILE_PATH.joinpath(model_file)):
 		print('====================DETECTING BAP RETRAINED MODEL======================\n')
 		print('Checking Step1:\t No BAP retrained model found...\n')
 		print('====================RETRAINING======================\n')
+		train_command = TRAIN_MAP[cfg.attack.name] + f" -d {FILE_PATH.joinpath(f'data/{cfg.data_split}_split')} -o {FILE_PATH} --new_model {model_file}  --old_model  "
+		train_process = subprocess.Popen(train_command, shell=True, stdout=subprocess.PIPE)
+		train_process.communicate()
 	else:
 		print(f'Loading BAP retrained model @{FILE_PATH.joinpath(model_file)}...\n')
-	train_command = TRAIN_MAP[cfg.attack.name] + f' -d data/tcr_split --output {str(FILE_PATH)} --new_model {model_file}'
-	# train_process = subprocess.Popen(train_command, shell=True, stdout=subprocess.PIPE)
-	train_process = subprocess.Popen(train_command, shell=True, stdout=subprocess.PIPE)
-	train_process.communicate()
-	return str(FILE_PATH.joinpath(model_file))
+	return model_file
 
 
 def bap_update(cfg, old_model, data):
 	# new model should be saved at the same directory as the old model and add one more round number
-	rd = Path(old_model).stem.split('_')[-1]
+	old_path = Path(old_model)
+	rd = old_path.stem.split('_')[-1]
 	if rd.isnumeric():
-		rd = int(rd)+1
+		new_model = old_path.parent.joinpath(old_path.stem.replace(rd, str(int(rd)+1))).with_suffix(old_path.suffix)
+		
 	else: 
-		rd = 1
-	new_model = f'{cfg.attack.name}_retrain_{rd}.ckpt'
+		new_model = old_path.parent.joinpath(old_path.stem+'_1').with_suffix(old_path.suffix)
+
 	# update bap model with new data
-	train_command = TRAIN_MAP[cfg.attack.name] + f' -d {data} --output {str(FILE_PATH)} --new_model {new_model} --old_model {old_model}'
+	train_command = TRAIN_MAP[cfg.attack.name] + f' -d {FILE_PATH.joinpath(data)} --output {FILE_PATH} --new_model {new_model} --old_model {old_model}'
 	train_process = subprocess.Popen(train_command, shell=True, stdout=subprocess.PIPE)
 	train_process.communicate()
-	return str(FILE_PATH.joinpath(new_model))
+	return new_model
 
 
 @hydra.main(config_path='configs', config_name='config', version_base='2.1')
@@ -176,7 +179,10 @@ def main(cfg: DictConfig):
 	# cfg = OmegaConf.to_container(cfg)
 	rd = 0
 	rlhf_settings = cfg.rlhf
-	storage_path = FILE_PATH.joinpath(f'{cfg.output_dir}')
+	output_dir = cfg.output_dir.replace(cfg.base_dir, '')[1:]
+	candidate_dir = f'{output_dir}/result'
+	tmp_dir =  f'{output_dir}/tmp'
+	candidate_path = FILE_PATH.joinpath(f'{candidate_dir}')
 
 	config_PPO = create_ppo_config(
 		name=cfg.rlhf.FILE.LM,
@@ -198,7 +204,7 @@ def main(cfg: DictConfig):
 		pass
 	else: 
 		raise NameError('Invalid RLHF name')
-	
+
 	# Integrate wandb
 	if wandb.run:
 		wandb_cfg = OmegaConf.to_container(cfg.wandb)
@@ -215,10 +221,8 @@ def main(cfg: DictConfig):
 
 	for r in range(cfg.augment_rounds):
 		# TODO: deal with tmp and result directory if they exist (add a protection layer)
-		
-		
 		# start LM and RM model tunning
-		for epoch in tqdm(range(rlhf_settings.rounds)):
+		for epoch in tqdm(range(rlhf_settings.generation_rounds)):
 			for batch in islice(ppo_trainer.dataloader, 1):
 				query_tensors = batch["input_ids"]
 				response_tensors = []
@@ -237,32 +241,31 @@ def main(cfg: DictConfig):
 					stats = ppo_trainer.step(query_tensors, response_tensors, list(torch.unbind(reward_tensors, dim=0)))
 					# ppo_trainer.log_stats(stats, batch, reward_tensors.detach().numpy())
 					info = {'Epitopes': [p[0] for p in pairs], 'TCRs': [p[1] for p in pairs], 'Rewards': [round(r.item(),4) for r in reward_tensors]}
-					save_to_csv(info, rd, storage_path.joinpath(f'result/attack_{cfg.attack.name}.csv'))
+					save_to_csv(info, rd, candidate_path.joinpath(f'attack_{cfg.attack.name}.csv'))
 
 					# Generate bap score (as reference)
 					if cfg.attack.name in ['catelmp-mlp', 'pite']:
 						pad =  True if cfg.attack.name == 'pite' else False
-						embed_command = CMD_MAP['embedder'] + f' --pad {pad} --folder {cfg.output_dir}/result'
+						embed_command = CMD_MAP['embedder'] + f' --pad {pad} --folder {candidate_dir}'
 						embed_process = subprocess.Popen(embed_command, shell=True, stdout=subprocess.PIPE)
 						embed_process.communicate()
 
-					reward_command = CMD_MAP[cfg.attack.name] + f' {cfg.output_dir}/result'
+					reward_command = CMD_MAP[cfg.attack.name] + f' {candidate_dir}'
 					process = subprocess.Popen(reward_command, shell=True, stdout=subprocess.PIPE)
 					stdout, stderr = process.communicate()
 
 					# update RM
-					lm_generation(ppo_trainer, tokenizer, rlhf_settings, storage_path.joinpath(f'tmp/attack_{cfg.attack.name}.csv'), rd)
-					if cfg.attack.name in ['catelmp-mlp']:
-						pad =  True if cfg.attack.name == 'pite' else False
-						embed_command = CMD_MAP['embedder'] + f' --pad {pad} --folder {cfg.output_dir}/result'
+					lm_generation(ppo_trainer, tokenizer, rlhf_settings, candidate_dir+f'/attack_{cfg.attack.name}.csv', rd)
+					if cfg.attack.name in ['catelmp-mlp', 'pite']:
+						embed_command = CMD_MAP['embedder'] + f' --model {cfg.attack.name} --data {tmp_dir}/attack_{cfg.attack.name}.csv'
 						embed_process = subprocess.Popen(embed_command, shell=True, stdout=subprocess.PIPE)
 						embed_process.communicate()
-					reward_command = CMD_MAP[cfg.attack.name] + f' {cfg.output_dir}/tmp'
+					reward_command = CMD_MAP[cfg.attack.name] + f' -d {tmp_dir} -m {model_dir}'
 					process = subprocess.Popen(reward_command, shell=True, stdout=subprocess.PIPE)
 					stdout, stderr = process.communicate()
-					merge_results(storage_path.joinpath(f'tmp/attack_{cfg.attack.name}.csv'))
-					tabula_rasa_RMDataset(storage_path.joinpath(f'tmp/attack_{cfg.attack.name}_output.csv'), K=cfg.rlhf.K)
-					dataset_Reward = create_PreferenceDB(storage_path.joinpath(f'tmp/rmDataset.csv'), tokenizer, DEVICE)
+					merge_results(FILE_PATH.joinpath(tmp_dir).joinpath(f'attack_{cfg.attack.name}.csv'))
+					tabula_rasa_RMDataset(FILE_PATH.joinpath(tmp_dir).joinpath(f'attack_{cfg.attack.name}_output.csv'), K=cfg.rlhf.K)
+					dataset_Reward = create_PreferenceDB(FILE_PATH.joinpath(tmp_dir).joinpath(f'rmDataset.csv'), tokenizer, DEVICE)
 					reward_Trainer.train_dataset = dataset_Reward
 					reward_Trainer.train()
 					# remove tmp log directory
@@ -272,14 +275,13 @@ def main(cfg: DictConfig):
 					info = {'Epitopes': [p[0] for p in pairs], 'TCRs': [p[1] for p in pairs]}
 					# TODO: check if there is any way to improve this eception handling
 					info['TCRs'] = ['WRONGFORMAT' if (not s or any(token in s for token in SPECIAL_TOKENS)) else s for s in info['TCRs']]
-					override_csv(info, rd, storage_path.joinpath(f'result/attack_{cfg.attack.name}.csv'))
+					override_csv(info, rd, candidate_path.joinpath(f'attack_{cfg.attack.name}.csv'))
 
 					if cfg.attack.name in ['catelmp-mlp', 'pite']:
-						pad =  True if cfg.attack.name == 'pite' else False
-						embed_command = CMD_MAP['embedder'] + f' --pad {pad} --folder {cfg.output_dir}/result'
+						embed_command = CMD_MAP['embedder'] + f' --model {cfg.attack.name} --data {candidate_dir}/attack_{cfg.attack.name}.csv'
 						embed_process = subprocess.Popen(embed_command, shell=True, stdout=subprocess.PIPE)
 						embed_process.communicate()
-					reward_command = CMD_MAP[cfg.attack.name] + f' {cfg.output_dir}/result'
+					reward_command = CMD_MAP[cfg.attack.name] + f' -d {candidate_dir} -m {model_dir}'
 					process = subprocess.Popen(reward_command, shell=True, stdout=subprocess.PIPE)
 					rewards_json, _ = process.communicate()
 					rewards_data = json.loads(rewards_json)
@@ -292,31 +294,28 @@ def main(cfg: DictConfig):
 					# ppo_trainer.log_stats(stats, batch, eward_tensors.detach().numpy())
 				else:
 					raise NameError('Invalid RLHF name')
-
 				# filte the generated data and construct new dataset for bap retrain
-				eval_filter(folder=f'{cfg.output_dir}/result', bap=cfg.attack.name, **cfg.attack.filter)
-				merge_results(storage_path.joinpath(f'result/attack_{cfg.attack.name}.csv'))
+				eval_filter(folder=f'{candidate_path}', bap=cfg.attack.name, **cfg.attack.filter)
+				merge_results(candidate_path.joinpath(f'attack_{cfg.attack.name}.csv'))
 				rd+=1
 			print(f'\nEpoch {epoch}:')
-			
+
 		# construct new	round of rhlf data generation
-		candidate_path = select_candidates(storage_path.joinpath(f'result/attack_{cfg.attack.name}.csv'), r, method='neg_control')
+		select_candidates(candidate_path.joinpath(f'attack_{cfg.attack.name}_output.csv'), method='neg_control')
 		if cfg.attack.name in ['catelmp-mlp', 'pite']:
-			pad =  True if cfg.attack.name == 'pite' else False
-			embed_command = CMD_MAP['embedder'] + f' --pad {pad} --folder {cfg.output_dir}/neg_control.csv'
+			embed_command = CMD_MAP['embedder'] + f' --model {cfg.attack.name} --data {candidate_dir}/neg_control.csv'
 			embed_process = subprocess.Popen(embed_command, shell=True, stdout=subprocess.PIPE)
 			embed_process.communicate()
 		# retrain the model with augmented data
-		augment_dataset(candidate_path, FILE_PATH.joinpath('data/tcr_split'))
+		augment_dataset(cfg.attack.name, candidate_path, FILE_PATH.joinpath('data/tcr_split'))
 		model_dir = bap_update(cfg, model_dir, candidate_path)
 		# evaluate the new model and report results
-		
-
-		clean_result(storage_path.joinpath(f'{cfg.output_dir}'))
+		# clean_result(storage_path.joinpath(f'{cfg.output_dir}'))
 		print(f'Agumentation round: {r}')
-		
-
+		candidate_dir = str((f'{output_dir}/iter_{r}'))
+		candidate_path = FILE_PATH.joinpath(f'{candidate_dir}')
 	wandb.finish()
+
 
 if __name__ == '__main__':
 	main()

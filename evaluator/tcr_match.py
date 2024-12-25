@@ -130,7 +130,7 @@ blosum62 = [
 
 def evaluate(folder, bap):
 	random.seed(42)
-	generated_data = Path(prefix).joinpath(f'bap_attack/{folder}/attack_{bap}.csv')
+	generated_data = Path(folder).joinpath(f'attack_{bap}.csv')
 	generated_data_file = str(generated_data)
 	selected_data_file = str(SELECTED_DATA)
 	designed_TCRs = pd.read_csv(generated_data_file)

@@ -58,7 +58,7 @@ def evaluate(folder, bap):
 	model.resize_token_embeddings(len(tokenizer)) 
 	tokenizer.pad_token = tokenizer.eos_token
 	# Read the generated TCRs
-	generated = Path(PREFIX).joinpath(f'bap_attack/{folder}/attack_{bap}.csv')
+	generated = Path(folder).joinpath(f'attack_{bap}.csv')
 	data_file = str(generated)
 	designed_TCRs = pd.read_csv(data_file)
 	
