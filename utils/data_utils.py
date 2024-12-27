@@ -49,11 +49,7 @@ def merge_results(tmp_filename, master_filename=None):
 def select_candidates(file, method):
 	storage_dir = Path(file).parent
 	contents = pd.read_csv(file)
-	# try:
-	# 	Path.mkdir(storage_path, parents=True, exist_ok=False)
-	# except FileExistsError:
-		# print(f'Folder {storage_dir} already exists')
-		# exit(1)
+	
 	if method == 'neg_control':
 		candidates = contents[(contents['yhat'] > 0) & 
 						(contents['gpt_ll_mean'] < 1.06) & 
@@ -66,7 +62,6 @@ def select_candidates(file, method):
 		candidates.to_csv(storage_dir.joinpath('neg_control.csv'), header=True, index=False)
 	else:
 		raise NameError('Method not recognized')
-	# return storage_dir
 
 def augment_dataset(attack, storage_path, original_data):
 	if attack in ['pite', 'catelmp-mlp']:

@@ -1,23 +1,23 @@
-from datasets import Dataset
-import torch.utils
-from transformers import AutoTokenizer, pipeline, GPT2Tokenizer, AutoModelForSequenceClassification
-from trl import PPOTrainer, PPOConfig, AutoModelForCausalLMWithValueHead, create_reference_model, RewardTrainer, RewardConfig
-from tqdm import tqdm
-from utils.data_utils import save_to_csv, override_csv, merge_results, select_candidates, augment_dataset, clean_result
-import subprocess
-import json
-import torch
-# from torch.utils.data import DataLoader, Dataset
 from pathlib import Path
+import shutil
 import os,sys
+import json
+from tqdm import tqdm
 import wandb
 import hydra
-
-from torch.optim.lr_scheduler import LambdaLR
 from omegaconf import DictConfig, OmegaConf
+import subprocess
+from itertools import islice
+
+import torch
+import torch.utils
+from torch.optim.lr_scheduler import LambdaLR
+from transformers import AutoTokenizer, pipeline, GPT2Tokenizer, AutoModelForSequenceClassification
+from trl import PPOTrainer, PPOConfig, AutoModelForCausalLMWithValueHead, create_reference_model, RewardTrainer, RewardConfig
+
 from utils.rlhf_utils import create_PreferenceDB, create_ScoreQuery, create_RewardInferene, tabula_rasa_RMDataset, lookup_best_reward
 from utils.rlhf import create_ppo_config, eval_filter
-from itertools import islice
+from utils.data_utils import save_to_csv, override_csv, merge_results, select_candidates, augment_dataset, clean_result
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -33,13 +33,15 @@ sys.path.append(prefix)
 LOG_DIR = str(FILE_PATH.joinpath('logs'))
 CMD_MAP = {'atmTCR': f'conda run -n atm-tcr python bap_reward/atmTCR_infer.py',
 	   'catelmp-mlp': f'bash -c "source activate tf26 && python bap_rewards/pite.py"',\
-	   'ergo': f'bash -c "source activate torch14_conda && python bap_reward/ergo.py"',\
-	   'titan': f'conda run -n titan python bap_attack/bap_reward/titan.py',\
+	   'ergoLSTM': f'conda run -n ergo python bap_reward/ergo_infer.py',\
+	   'titan': f'conda run -n titan python bap_reward/titan_infer.py',\
 	   'pite': f'conda run -n tf26 python bap_reward/pite_infer.py',\
 	   'embedder': f'conda run -n torch14_conda python bap_reward/embedder.py',\
 }
 TRAIN_MAP = {'pite': f'conda run -n tf26 python bap_train/pite_train.py',\
 			 'atmTCR': f'conda run -n atm-tcr python bap_train/atmTCR_train.py',\
+			 'ergoLSTM': f'conda run -n ergo python bap_train/ergo_train.py',\
+			 'titan': f'conda run -n titan python bap_train/titan_train.py',\
 }
 SPECIAL_TOKENS = ["<PAD>", "<tcr>", "<eotcr>", "[CLS]", "[BOS]", "[MASK]", "[SEP]", "<epi>", "<eoepi>", "$", '<unk>']
 
@@ -140,7 +142,7 @@ def rlhf_init(cfg, ppo_trainer, tokenizer):
 def bap_init(cfg):
 	# retrain bap_model if its not saved at model_dir
 	if OmegaConf.is_missing(cfg.attack, 'retrain_model'):
-		model_file = f'{cfg.attack.name}_{cfg.data_split}_retrain'
+		model_file = f'{cfg.attack.name}_{cfg.data_split}_retrain.{cfg.attack.model_suffix}'
 	else:
 		model_file = cfg.attack.retrain_model
 	if not os.path.exists(FILE_PATH.joinpath(model_file)):
@@ -152,7 +154,12 @@ def bap_init(cfg):
 		train_process.communicate()
 	else:
 		print(f'Loading BAP retrained model @{FILE_PATH.joinpath(model_file)}...\n')
-	return model_file
+	child_file = Path(model_file).name
+	output_dir = Path(cfg.output_dir)
+	cur_model = output_dir.joinpath(child_file)
+	shutil.copy(FILE_PATH.joinpath(model_file), output_dir.joinpath(child_file))
+	print(f'Moved BAP to current experiment directory @{cur_model}...\n')
+	return cur_model
 
 
 def bap_update(cfg, old_model, data):
@@ -216,6 +223,7 @@ def main(cfg: DictConfig):
 	if cfg.attack.re_train:
 		model_dir = bap_init(cfg)
 	else:
+		# TODO: implement if test other model's adaptibility
 		model_dir = cfg.attack.default_model
 
 

@@ -122,18 +122,16 @@ def atm_tcr(dataset_dir, output_dir, new_model, old_model, epochs):
 
 	embedding_matrix = load_embedding(filename=str(Args.blosum))
 	model = Net(embedding_matrix, Args).to(DEVICE)
-	if old_model is not None:
+	if old_model is None:
+		train_epi, train_tcr, train_label = load_dataset(dataset_dir, 'training.pkl', shuffle=True, partial=0.8)
+		val_epi, val_tcr, val_label = load_dataset(dataset_dir, 'training.pkl', shuffle=False, partial=-0.2)
+	else:
 		model.load_state_dict(torch.load(output_dir.joinpath(old_model), map_location=DEVICE))
 		logger.info(f'Model loaded from {output_dir.joinpath(old_model)}')
-		train_epi, train_tcr, train_label = load_dataset(dataset_dir, 'training.pkl', shuffle=True, partial=0.8)
-		val_epi, val_tcr, val_label = load_dataset(dataset_dir, 'training.pkl', shuffle=False, partial=-0.2)
 		train_epi, train_tcr, train_label = load_dataset(dataset_dir, 'trainData.pkl', shuffle=True, partial=0.8)
 		val_epi, val_tcr, val_label = load_dataset(dataset_dir, 'trainData.pkl', shuffle=False, partial=-0.2)
-	else:
-		train_epi, train_tcr, train_label = load_dataset(dataset_dir, 'training.pkl', shuffle=True, partial=0.8)
-		val_epi, val_tcr, val_label = load_dataset(dataset_dir, 'training.pkl', shuffle=False, partial=-0.2)
-	
 	logger.info(f'Loading training dataset from {dataset_dir}')
+	
 	train_loader = define_dataloader(train_epi, train_tcr, train_label,
                                      Args.max_len_pep, Args.max_len_tcr,
                                      padding=Args.padding,
@@ -189,9 +187,10 @@ def atm_tcr(dataset_dir, output_dir, new_model, old_model, epochs):
 	for batch in test_loader['loader']:
 		X_pep, X_tcr, y = batch.X_pep.to(DEVICE), batch.X_tcr.to(DEVICE), batch.y.to(DEVICE)
 		yhat_list.append(model(X_pep, X_tcr).cpu().detach().numpy())
-		y_list.append(y)
-	yhat = np.vstack(yhat_list)
-	y = np.vstack(y_list)
+		y_list.append(y.cpu().detach().numpy())
+	yhat = np.concatenate(yhat_list)
+	# TODO: fix later
+	y = np.concatenate(y_list)
 	roc = roc_auc_score(y, yhat)
 	logger.info(f'AUC: {roc}')
 	acc = accuracy_score(y, np.round(yhat))

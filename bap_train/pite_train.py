@@ -33,9 +33,9 @@ DATASET_DIR = Path(prefix).joinpath('/home/hmei7/workspace/tcr/attack/bap_attack
 OUTPUT_DIR =  Path(prefix).joinpath('bap_attack')
 
 # NEW_MODEL = 'model_list/pite_tcr_retrain.keras'
-NEW_MODEL = 'model_list/pite_tcr_retrain_checkpoint_1.keras'
-OLD_MODEL = 'model_list/pite_tcr_retrain_checkpoint.keras'
-DEVICE = '/GPU:3' if len(tf.config.experimental.list_physical_devices('GPU'))>0 else '/CPU:0'
+NEW_MODEL = 'model_list/pite_tcr_retrain_1.keras'
+OLD_MODEL = 'model_list/pite_tcr_retrain.keras'
+DEVICE = '/GPU:0' if len(tf.config.experimental.list_physical_devices('GPU'))>0 else '/CPU:0'
 os.environ["CUDA_VISIBLE_DEVICES"] = f'cuda:{DEVICE}'
 
 np.random.seed(SEED) 
@@ -77,9 +77,9 @@ class InMemoryDataset(keras.utils.Sequence):
 		self.dataDir = Path(dataDir)
 		self.dataset = dataset
 		assert partial <= 1 and partial>-1, ValueError('Partial belongs to(-1, 1]')
-		assert dataset in ['trainData', 'testData'], NameError('Only training, testing, and polling datasets are supported')
+		assert dataset in ['trainData', 'testData'], NameError('Only trainData', 'testData datasets are supported')
 		self.threshold = partial
-		index_map = pd.read_pickle(dataDir.joinpath(f'{dataset}.pkl'))
+		index_map = pd.read_pickle(self.dataDir.joinpath(f'{dataset}.pkl'))
 		self.points = len(index_map)
 		if partial <= 0:
 			self.data_mapping = index_map.iloc[int(self.threshold*self.points)-1:self.points]
@@ -97,10 +97,12 @@ class InMemoryDataset(keras.utils.Sequence):
 
 	def __len__(self):
 		'Denotes the number of batches per epoch'
-		return int(np.floor(len(self.indexes) / self.batch_size))
+		return int(np.ceil(len(self.indexes) / self.batch_size))
 
 	def __getitem__(self, index):
 		# TODO: Generator is used for inDiskDataset
+		if index >= len(self):
+			raise StopIteration
 		indexes = self.indexes[index*self.batch_size:((index+1)*self.batch_size)]
 		tcr_list = []
 		epi_list = []
@@ -288,13 +290,13 @@ def pite(data, output_dir, new_model, old_model):
 			traingen = InMemoryDataset(data, 'trainData', BATCH_SIZE, partial=0.8)
 			valgen =  InMemoryDataset(data, 'trainData', BATCH_SIZE, partial=-0.2)
 		# exp_name = 'myTransformer256_'+'tcr'+'_run_'+str(1)
-	
+		new_model_path = Path(new_model)
 		early_stopping = keras.callbacks.EarlyStopping(monitor='val_loss', 
 													   patience=30, 
 													   verbose=1,
 													   mode='min',
 													  )
-		check_point = keras.callbacks.ModelCheckpoint(str(new_model).split('.')[0]+'_checkpoint.keras', 
+		check_point = keras.callbacks.ModelCheckpoint(new_model_path.partent.joinpath(f'{new_model_path.stem}_checkpoint.{new_model_path.suffix}'), 
 												      monitor='val_loss', 
 													  verbose=1, 
 													  save_best_only=True, 
@@ -306,32 +308,31 @@ def pite(data, output_dir, new_model, old_model):
 		optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
 		model.compile(loss='binary_crossentropy', optimizer=optimizer)
 		model.fit(traingen, validation_data=valgen, callbacks=callbacks, epochs = args.epochs)
-	model.save(NEW_MODEL)
+	model.save(new_model)
 	# model1 = load_model(NEW_MODEL, custom_objects={'MyTransformerModel': MyTransformerModel})
 	## Evaluation
 	logger.info('Evaluating...')
-	logger.info('Loading testing data...')
 	if old_model is None:
 		testData = InDiskDataGenerator(split, 'testing', BATCH_SIZE, shuffle=False, partial=1)
 	else:
 		testData = InMemoryDataset(data, 'testData', BATCH_SIZE, shuffle=False, partial=1)
+	logger.info(f'Loading data @{data}')
 	y = []
 	yhat = []
-	if old_model is None:
-		with tf.device(DEVICE):
-			for i in tqdm(range(len(testData))):
-				yhat.append(model(testData[i][0]).numpy())
-				y.append(testData[i][1])
-			y = np.concatenate(y)
-			yhat = np.concatenate(yhat)
-			auc = roc_auc_score(y, yhat)
-		logger.info(f'AUC: {auc}')
-		yhat[yhat > 0.5] = 1
-		yhat[yhat <= 0.5] = 0
-		yhat = yhat.flatten().astype(int)
-		# print_performance(y, yhat)
-		accuracy = accuracy_score(y, yhat)
-		logger.info(f'Accuracy: {accuracy}')
+	with tf.device(DEVICE):
+		for i in tqdm(range(len(testData))):
+			yhat.append(model.predict(tf.convert_to_tensor(testData[i][0]), verbose=0))
+			y.append(testData[i][1])
+		y = np.concatenate(y)
+		yhat = np.concatenate(yhat)
+		auc = roc_auc_score(y, yhat)
+	logger.info(f'AUC: {auc}')
+	yhat[yhat > 0.5] = 1
+	yhat[yhat <= 0.5] = 0
+	yhat = yhat.flatten().astype(int)
+	# print_performance(y, yhat)
+	accuracy = accuracy_score(y, yhat)
+	logger.info(f'Accuracy: {accuracy}')
 
 if __name__ == '__main__':
 	args = parser.parse_args()

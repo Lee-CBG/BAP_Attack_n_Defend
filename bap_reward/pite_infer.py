@@ -21,10 +21,10 @@ FILE_PATH = os.path.dirname(os.path.abspath(__file__))
 root_dir = 'attack'
 prefix = str(FILE_PATH)[:(str(FILE_PATH).find(root_dir)+len(root_dir))] if str(FILE_PATH).find(root_dir)!=-1 else str(FILE_PATH)+f'/{root_dir}' # in case cwd is below root_dir level
 REWARD_PATH = Path(prefix).joinpath('pite')
-REWARD_MODEL = 'model_list/pite_tcr_retrain_checkpoint.keras'
-ATTACK_DATA = 'outputs/2024-12-25/01-23-55/result'
+REWARD_MODEL = 'outputs/2024-12-26/22-01-39/pite_tcr_retrain.keras'
+ATTACK_DATA = 'outputs/2024-12-26/22-01-39/result'
 BATCH_SIZE = 128
-DEVICE = '/GPU:3' if len(tf.config.experimental.list_physical_devices('GPU'))>0 else '/CPU:0'
+DEVICE = '/GPU:0' if len(tf.config.experimental.list_physical_devices('GPU'))>0 else '/CPU:0'
 sys.path.append(str(REWARD_PATH))
 os.environ["CUDA_VISIBLE_DEVICES"] = f'cuda:{DEVICE}'
 
@@ -108,21 +108,17 @@ def pite(attack_data, model_dir):
 
 	## Predict
 	with tf.device(DEVICE):
-		yhat = model((X1_test, X2_test))
+		X1_test = tf.convert_to_tensor(X1_test, dtype=tf.float32)
+		X2_test = tf.convert_to_tensor(X2_test, dtype=tf.float32)
+		yhat = model.predict((X1_test, X2_test))
 	
 	# dat1 = pd.read_csv(f'tmp_epis_tcrs.csv')
 	data_file_original =data.parent.joinpath(f'{data.stem}'+'.csv')
 	# data_file_output =ATTACK_DATA.parent.joinpath(f'{ATTACK_DATA.stem}_output'+'.csv')
 	dat1 = pd.read_csv(data_file_original)
-	dat1['yhat'] = yhat
+	dat1['yhat'] = np.round(yhat.squeeze(),5)
 	dat1.to_csv(data_file_original, index=False, mode='w')
-	# if not os.path.exists(data_file_output):
-	# 	dat1.to_csv(data_file_output, index=False, mode='w')
-	# else:
-	#     dat1.to_csv(data_file_output, header= False, index=False, mode='a')
-	# # Serialize the output as JSON and print it
-
-	json_output = json.dumps(yhat.numpy().tolist())
+	json_output = json.dumps(yhat.tolist())
 	print(json_output)
 
 

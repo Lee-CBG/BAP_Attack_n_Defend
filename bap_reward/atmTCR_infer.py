@@ -1,9 +1,9 @@
 import os, sys
 from pathlib import Path
 from dataclasses import dataclass
+import numpy as np
 import torch
 import torch.nn as nn
-import numpy as np
 import pandas as pd
 import json
 from copy import deepcopy
@@ -22,7 +22,7 @@ prefix = cwd[:(cwd.find(root_dir)+len(root_dir))] if cwd.find(root_dir)!=-1 else
 REWARD_DIR = Path(prefix).joinpath('ATM-TCR')
 sys.path.append(str(REWARD_DIR))
 
-ATTACK_DATA = 'experiments/result'
+ATTACK_DATA = 'outputs/2024-12-26/03-48-48/result'
 REWARD_MODEL ='model_list/atmTCR_tcr_retrain.ckpt'
 DEVICE = torch.device('cuda:3' if torch.cuda.is_available() else 'cpu')
 
@@ -121,7 +121,7 @@ def atm_tcr(data_dir, model_dir):
 		y_score.extend(score.to('cpu').numpy().tolist())
 	dat1 = pd.read_csv(data)
 	# data_file_output = str(data.parent.joinpath(f'{data.stem}_output' + data.suffix))
-	yhat = np.array(y_score).squeeze()
+	yhat = np.round(np.array(y_score).squeeze(),5)
 	dat1['yhat'] = yhat
 	# if not os.path.exists(data_file_output):
 	# 	dat1.to_csv(data_file_output, index=False, mode='w')

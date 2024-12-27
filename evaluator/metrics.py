@@ -20,12 +20,12 @@ class Stats:
 	
 	def get_score_avg(self, round):
 		result = self.get_data(round).groupby('Iter').mean(numeric_only=True)
-		print(result)
+		# print(result)
 		return result
 	
 	def get_score_std(self, round):
 		result = self.get_data(round).groupby('Iter').std(numeric_only=True)
-		print(result)
+		# print(result)
 		return result
 	
 

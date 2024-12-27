@@ -143,6 +143,7 @@ def evaluate(folder, bap):
 	designed_TCRs['gpt_ll_mean'] = designed_TCRs['gpt_ll'] / designed_TCRs['TCRs'].str.len()
 
 	# Compute match scores for each pair of generated and preselected real TCRs
+	# first check gpt_ll then tcr_match for computational efficiency
 	for i, designed_tcr in enumerate(tqdm(designed_TCRs['TCRs'], desc="Computing match scores")):
 		if designed_TCRs['yhat'][i] > 0 and \
 		   designed_TCRs['gpt_ll_mean'][i] < 1.06 and \
