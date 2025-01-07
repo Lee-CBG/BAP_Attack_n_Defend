@@ -5,7 +5,9 @@ import pandas as pd
 from pathlib import Path
 import logging
 from tqdm import tqdm
+import wandb
 from sklearn.metrics import accuracy_score, roc_auc_score
+from sklearn.model_selection import train_test_split
 
 import tensorflow as tf
 from tensorflow.keras.models import Model, load_model
@@ -29,22 +31,19 @@ sys.path.append(str(REWARD_DIR))
 BATCH_SIZE = 64
 SEED = 42
 PRINT_EVERY_EPOCH = 1
-DATASET_DIR = Path(prefix).joinpath('/home/hmei7/workspace/tcr/attack/bap_attack/outputs/2024-12-25/05-45-17/result')
+DATASET_DIR = Path(prefix).joinpath('/home/hmei7/workspace/tcr/attack/bap_attack/outputs/2025-01-03/01-56-21/iter_0')
 OUTPUT_DIR =  Path(prefix).joinpath('bap_attack')
 
 # NEW_MODEL = 'model_list/pite_tcr_retrain.keras'
 NEW_MODEL = 'model_list/pite_tcr_retrain_1.keras'
 OLD_MODEL = 'model_list/pite_tcr_retrain.keras'
-DEVICE = '/GPU:0' if len(tf.config.experimental.list_physical_devices('GPU'))>0 else '/CPU:0'
-os.environ["CUDA_VISIBLE_DEVICES"] = f'cuda:{DEVICE}'
-
 np.random.seed(SEED) 
 
-
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(levelname)s - %(message)s',
-	filename = Path(prefix).joinpath(f'bap_attack/logs/{Path(NEW_MODEL).stem}.log')
+	level=logging.INFO,
+	format='%(levelname)s - %(message)s',
+	filemode='w',
+	filename = Path(prefix).joinpath(f'bap_attack/logs/pite_train.log')
 )
 logger = logging.getLogger(__name__)
 
@@ -55,6 +54,7 @@ parser.add_argument('-o', '--output_dir', type=Path, default=OUTPUT_DIR)
 parser.add_argument('--new_model', type=str, default=NEW_MODEL)
 parser.add_argument('--old_model', type=str, default=OLD_MODEL)
 parser.add_argument('--epochs', type=int, default=200)
+parser.add_argument('--device', type=int, default=-1)
 
 
 def get_diskid_map(split, dataset):
@@ -126,6 +126,15 @@ class InMemoryDataset(keras.utils.Sequence):
 	
 	def get_channels(self):
 		return self.n_channels
+	
+	def get_seperated_data(self, group):
+		assert group in ['neg_control'], 'invalid group'
+		grp = self.data_mapping.groupby('groups')
+		data = grp.get_group(group)
+		return data[['tcr', 'epi', 'tcr_embeds', 'epi_embeds']]
+	
+	def get_log_info(self):
+		return self.data_mapping['tcr_embeds'].to_list(), self.data_mapping['epi_embeds'].to_list(), self.data_mapping['binding'].to_numpy(), self.data_mapping['groups'].to_numpy()
 
 
 class InDiskDataGenerator(keras.utils.Sequence):
@@ -196,6 +205,53 @@ class InDiskDataGenerator(keras.utils.Sequence):
 	def get_channels(self):
 		return self.n_channels
 	
+	def get_seperated_data(self, group):
+		assert group in ['neg_healthy', 'neg_shuffle', 'pos'], 'invalid group'
+		grp = self.disk_map.groupby('groups')
+		data = grp.get_group(group)
+		return data[['tcr', 'epi', 'npz_id']]
+
+
+class GroupMetricsCallback(tf.keras.callbacks.Callback):
+	def __init__(self, train_data, train_groups, val_data, val_groups, groups, device):
+		super().__init__()
+		self.train_data = train_data
+		self.train_groups = train_groups
+		self.val_data = val_data
+		self.val_groups = val_groups
+		self.groups = groups
+		self.device = device
+
+	def compute_group_metrics(self, features, labels, groups, split_name, epoch):
+		with tf.device(self.device):
+			epi = tf.convert_to_tensor(features[0], dtype=tf.float32)
+			tcr = tf.convert_to_tensor(features[1], dtype=tf.float32)
+			predictions = self.model.predict((epi, tcr), verbose=0)
+		for group in self.groups:
+			group_mask = (groups == group)
+			group_true = labels[group_mask]
+			group_pred = predictions[group_mask].squeeze()
+
+			group_loss = tf.keras.losses.binary_crossentropy(group_true, group_pred)
+			group_acc = tf.reduce_mean(
+				tf.cast(tf.round(group_pred) == group_true, tf.float32)
+			)
+
+			# Log metrics to wandb
+			wandb.log({
+				f"{split_name}/{group}_loss": tf.reduce_mean(group_loss).numpy(),
+				f"{split_name}/{group}_accuracy": group_acc.numpy(),
+				f"{split_name}/{group}_count": np.sum(group_mask),
+				"epoch": epoch
+			})
+
+	def on_epoch_end(self, epoch, logs=None):
+		train_features, train_labels = self.train_data
+		self.compute_group_metrics(train_features, train_labels, self.train_groups, "Training", epoch)
+
+		val_features, val_labels = self.val_data
+		self.compute_group_metrics(val_features, val_labels, self.val_groups, "Validation", epoch)
+
 
 class TransformerBlock(Layer):
 	def __init__(self, embed_dim, num_heads, ff_dim, rate=0.1):
@@ -258,13 +314,20 @@ class MyTransformerModel(Model):
 		output = self.dense2(concate)
 		return output
 
-def pite(data, output_dir, new_model, old_model):
+def pite(data, output_dir, new_model, old_model, device):
+	if device == -1:
+		os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+		DEVICE = '/CPU:0'
+	else:
+		device = 0
+		DEVICE = f'/GPU:{device}'
+	
 	lr = 0.001
 	if not old_model:
 		old_model = None
 	else:
-		lr *= 0.001
-		
+		lr *= 0.01
+	logger.info('====================================')
 	logger.info('Start training...')
 	# Inputs
 	X_tcr = Input(shape=(22, 1024), name='X_tcr')
@@ -291,37 +354,58 @@ def pite(data, output_dir, new_model, old_model):
 			valgen =  InMemoryDataset(data, 'trainData', BATCH_SIZE, partial=-0.2)
 		# exp_name = 'myTransformer256_'+'tcr'+'_run_'+str(1)
 		new_model_path = Path(new_model)
-		early_stopping = keras.callbacks.EarlyStopping(monitor='val_loss', 
-													   patience=30, 
-													   verbose=1,
-													   mode='min',
-													  )
-		check_point = keras.callbacks.ModelCheckpoint(new_model_path.partent.joinpath(f'{new_model_path.stem}_checkpoint.{new_model_path.suffix}'), 
-												      monitor='val_loss', 
-													  verbose=1, 
+		# early_stopping = keras.callbacks.EarlyStopping(monitor='val_loss', 
+		# 											   patience=30, 
+		# 											   verbose=1,
+		# 											   mode='min',
+		# 											  )
+		check_point = keras.callbacks.ModelCheckpoint(new_model_path.parent.joinpath(f'{new_model_path.stem}{new_model_path.suffix}'), 
+													  monitor='val_loss', 
+													  verbose=0,
 													  save_best_only=True, 
 													  mode='min',
 													 )
 		lrate_scheduler = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=10,
-											min_delta=0.0001, min_lr=1e-6, verbose=1)
-		callbacks = [check_point, early_stopping, lrate_scheduler]
+											min_delta=0.0001, min_lr=1e-6, verbose=0)
+		if old_model is None:
+			callbacks = [check_point, lrate_scheduler]
+		else:
+			wandb.init(project="bap_defendings_pite", name=f'{data.relative_to(data.parents[2])}')
+			
+			X1_train_split, X2_train_split, y_train_split, group_train_split = traingen.get_log_info()
+			X1_val, X2_val, y_val, group_val = valgen.get_log_info()
+			
+			group_metrics_callback = GroupMetricsCallback(
+													train_data=([X1_train_split, X2_train_split], y_train_split),
+													train_groups=group_train_split,
+													val_data=([X1_val, X2_val], y_val),
+													val_groups=group_val,
+													groups=['pos', 'neg_healthy', 'neg_shuffle', 'neg_control'],
+													device=DEVICE
+			)
+
+			callbacks = [check_point, lrate_scheduler, group_metrics_callback]
 		optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
 		model.compile(loss='binary_crossentropy', optimizer=optimizer)
 		model.fit(traingen, validation_data=valgen, callbacks=callbacks, epochs = args.epochs)
-	model.save(new_model)
-	# model1 = load_model(NEW_MODEL, custom_objects={'MyTransformerModel': MyTransformerModel})
+	# model.save(new_model)
 	## Evaluation
 	logger.info('Evaluating...')
 	if old_model is None:
 		testData = InDiskDataGenerator(split, 'testing', BATCH_SIZE, shuffle=False, partial=1)
 	else:
 		testData = InMemoryDataset(data, 'testData', BATCH_SIZE, shuffle=False, partial=1)
+	
 	logger.info(f'Loading data @{data}')
+	model = load_model(new_model, custom_objects={'MyTransformerModel': MyTransformerModel})
+	logger.info(f'Loading model @{new_model}')
 	y = []
 	yhat = []
 	with tf.device(DEVICE):
-		for i in tqdm(range(len(testData))):
-			yhat.append(model.predict(tf.convert_to_tensor(testData[i][0]), verbose=0))
+		for i in tqdm(range(len(testData))): 
+			yhat.append(model.predict(
+				(tf.convert_to_tensor(testData[i][0][0], dtype=tf.float32), tf.convert_to_tensor(testData[i][0][1], dtype=tf.float32)
+						  ), verbose=0))
 			y.append(testData[i][1])
 		y = np.concatenate(y)
 		yhat = np.concatenate(yhat)
@@ -332,8 +416,10 @@ def pite(data, output_dir, new_model, old_model):
 	yhat = yhat.flatten().astype(int)
 	# print_performance(y, yhat)
 	accuracy = accuracy_score(y, yhat)
-	logger.info(f'Accuracy: {accuracy}')
+	logger.info(f'ACC: {accuracy}')
+	wandb.log({'AUC': auc, 'ACC': accuracy})
+	logger.info('++++++++++++++++++++++++++++++++++++')
 
 if __name__ == '__main__':
 	args = parser.parse_args()
-	pite(args.dataset, args.output_dir, args.new_model, args.old_model)
+	pite(args.dataset, args.output_dir, args.new_model, args.old_model, args.device)

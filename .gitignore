@@ -12,3 +12,4 @@ model_list/
 *.ipynb
 logs/
 *.out
+*.ipynb

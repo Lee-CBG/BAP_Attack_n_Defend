@@ -1,4 +1,4 @@
-import os
+import os, sys
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -125,3 +125,84 @@ def clean_result(dir='experiments'):
 			raise NameError('Unsafe operation')
 	shutil.rmtree(dir) 
 	
+def load_dataset(dataDir, dataset, shuffle, partial):
+	pickle_file = Path(dataDir).joinpath(dataset)
+	df = pd.read_pickle(pickle_file)
+	l = df.shape[0]
+	threshold = int(l * partial)
+	
+	# return array of peptides, array of tcrs, array of labels
+	if partial <= 0:
+		x_pep = df.iloc[threshold-1:l]['epi'].values
+		x_tcr = df.iloc[threshold-1:l]['tcr'].values
+		y = df.iloc[threshold-1:l]['binding'].values
+		group = df.iloc[threshold-1:l]['groups'].values
+	else:
+		x_pep =df.iloc[0:threshold]['epi'].values
+		x_tcr = df.iloc[0:threshold]['tcr'].values
+		y = df.iloc[0:threshold]['binding'].values
+		group = df.iloc[0:threshold]['groups'].values
+	index = np.arange(x_pep.shape[0])
+	if shuffle:
+		np.random.shuffle(index)		
+	return x_pep[index], x_tcr[index], y[index], group[index]
+
+def shuffle_data(x_pep, x_tcr, y):
+	index = np.arange(x_pep.shape[0])
+	np.random.shuffle(index)
+	return x_pep[index], x_tcr[index], y[index]	
+
+def local_read_candidateTCR(filename):
+	peptides=[]
+	tcrs=[]
+	bound=[]
+	# 2 columns: peptides, tcrs, Optional[bounds] candidate pairs
+	infile=open(filename, "r")
+	for l in infile:
+		if l[0] != "#":
+			data = l.strip().split("\t")
+			if len(data) < 2:
+				data = l.strip().split(",")
+			if len(data) < 2:
+				sys.stderr.write("Problem with input file format!\n")
+				sys.stderr.write(l)
+				sys.exit(2)
+			else:
+				if data[0].lower() not in ["epitopes", "peptides"]:
+					peptides.append(data[0])
+					# TODO: check if TCR is longer than 20 amino acids.
+					tmp = data[1]
+					# if len(tmp) > 20:
+					#	 # get from left and right 10 amino acids
+					#	 tmp = tmp[:10] + tmp[-10:]
+					# tcrs.append(tmp)
+					tcrs.append(data[1])
+					if len(data) > 2:
+						bound.append(data[2])
+	peptides_np = np.array(peptides)
+	tcrs_np = np.array(tcrs)
+	bound_np = np.array(bound) if bound else None
+	infile.close()
+	return peptides_np, tcrs_np, bound_np
+
+
+# def local_read_candidatePair(filename):
+# 	pair = []
+# 	# 2 columns: peptides, tcrs, Optional[bounds] candidate pairs
+# 	infile=open(filename, "r")
+# 	for l in infile:
+# 		if l[0] != "#":
+# 			data = l.strip().split("\t")
+# 			if len(data) < 2:
+# 				data = l.strip().split(",")
+# 			if len(data) < 2:
+# 				sys.stderr.write("Problem with input file format!\n")
+# 				sys.stderr.write(l)
+# 				sys.exit(2)
+# 			else:
+# 				if data[0].lower() not in ["epitopes", "peptides"]:
+# 					# dummy labels
+# 					pair.append((data[1], (data[0]), 'p'))
+
+# 	infile.close()
+# 	return pair

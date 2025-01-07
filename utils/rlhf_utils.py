@@ -103,7 +103,7 @@ def lookup_best_reward(checkpont_dir, best_dir=None):
         return Path(checkpont_dir).joinpath(best_dir)
 
 
-def create_ScoreQuery(bap_TrainigData, tokenizer, device):
+def create_ScoreQuery(bap_TrainigData, tokenizer):
     with open(bap_TrainigData) as f:
         dataset_line = f.readlines()
     epis = []
@@ -118,8 +118,9 @@ def create_ScoreQuery(bap_TrainigData, tokenizer, device):
     dataset = Dataset.from_dict(my_dataset)
     dataset.set_format("pytorch")
     dataset = dataset.map(
-    lambda x: {"input_ids": tokenizer.encode(x["epis"], return_tensors="pt")[0, :64].to(device)},
+    lambda x: {"input_ids": tokenizer.encode(x["epis"], return_tensors="pt")[0, :64]},
     batched=False,
 )
-    dataset = dataset.map(lambda x: {"query": tokenizer.decode(x["input_ids"].to(device))}, batched=False)
+    dataset = dataset.map(lambda x: {"query": tokenizer.decode(x["input_ids"])}, batched=False)
+    
     return dataset

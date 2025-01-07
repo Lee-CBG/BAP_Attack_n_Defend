@@ -35,6 +35,7 @@ from pytoda.smiles.smiles_language import SMILESTokenizer
 parser = argparse.ArgumentParser()
 parser.add_argument('-d', '--attack_data', type=str, default=ATTACK_DATA)
 parser.add_argument('-m', '--model_dir', type=str, default=REWARD_MODEL)
+parser.add_argument('-h', '--device', type=int, default=DEVICE)
 
 
 with open(REWARD_DIR.joinpath('owndata/owndata').joinpath('model_params.json')) as fp:
@@ -88,7 +89,7 @@ def process_titan(file, ext):
 
 
 
-def titan(data_dir, model_dir):
+def titan(data_dir, model_dir, device):
 	data_full = Path(prefix).joinpath('bap_attack').joinpath(data_dir).joinpath('attack_titan.csv')
 	model_full = Path(prefix).joinpath('bap_attack').joinpath(model_dir)
 
@@ -184,4 +185,4 @@ def titan(data_dir, model_dir):
 
 if __name__ == '__main__':
 	args = parser.parse_args()
-	titan(args.attack_data, args.model_dir)
+	titan(args.attack_data, args.model_dir, args.device)

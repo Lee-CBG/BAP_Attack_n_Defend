@@ -151,9 +151,11 @@ def evaluate(folder, bap):
 		   '<' not in designed_TCRs['TCRs'][i] and \
 		   'U' not in designed_TCRs['TCRs'][i] and \
 		   '>' not in designed_TCRs['TCRs'][i]:
-
-			for j, real_tcr in enumerate(df['tcr']):
-				scores[i, j] = TCRMatchNorm(designed_tcr, real_tcr)
+			if len(designed_TCRs['TCRs'][i]) <= 40:
+				for j, real_tcr in enumerate(df['tcr']):
+					scores[i, j] = TCRMatchNorm(designed_tcr, real_tcr)
+			else:
+				scores[i, :] = 0
 	# Select the maximum score for each generated TCR
 	max_scores = np.max(scores, axis=1)
 	designed_TCRs['tcr_match'] = max_scores
