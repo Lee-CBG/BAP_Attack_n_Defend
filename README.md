@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # BAP_Attack_n_Defend
 =======
 # data storage
@@ -13,4 +12,3 @@ score added to generated ${ATTACK_DATA}
 all data will be combined to ATTACK_DATA = **./${cfg.output_dir}/results/attack_{cfg.attack.name}_output.csv** by default. <br>
 
 
->>>>>>> 1-implement-atm-tcr
