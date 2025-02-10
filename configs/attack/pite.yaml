@@ -1,0 +1,9 @@
+defaults:
+  - _self_
+  - _shared_setting
+
+name: pite
+model_suffix: keras
+
+retrain_model: ${attack.model_dir}/${attack.name}_${data_split}_retrain.${attack.model_suffix}
+retrain_data: data/tcr_split

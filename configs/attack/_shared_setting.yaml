@@ -1,0 +1,6 @@
+filter:
+  gpt_ll: True
+  tcr_match: True
+
+re_train: True
+model_dir: 'model_list'
