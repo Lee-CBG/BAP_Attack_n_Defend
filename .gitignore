@@ -5,3 +5,4 @@ model_list/*
 outputs/*
 *.out
 __pycache__/*
+logs/*
