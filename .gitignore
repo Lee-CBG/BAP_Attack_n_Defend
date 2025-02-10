@@ -1,16 +1,8 @@
-log/
-__pycache__/
-*.whl
-.vscode/
-data_bap/
-experiments/
-data/
-outputs/
-*.csv
-backup_list/
-model_list/
+backup_list/*
+data/*
 *.ipynb
-logs/
+model_list/*
+outputs/*
 *.out
-*.ipynb
->>>>>>> 1-implement-atm-tcr
+__pycache__/*
+logs/*
