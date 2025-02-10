@@ -1,0 +1,7 @@
+backup_list/*
+data/*
+*.ipynb
+model_list/*
+outputs/*
+*.out
+__pycache__/*
