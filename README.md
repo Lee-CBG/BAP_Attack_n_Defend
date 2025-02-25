@@ -12,3 +12,32 @@ Generated data will be automatically stored at directory **bap_attack/outputs/<Y
 ## Apply filter 
 To generate negative control samples, we apply the filter under **bap_attack/utils/evaluator** directory and it is automatically called in our reproduction script. 
 
+# Envrionment configuration
+
+## bap_attack
+
+Dependencies:
+trl==0.11.1 
+torch==2.0.1 
+pandas==2.2.3
+numpy==1.26.4
+wandb==0.18.3
+hydra-core==1.3.2
+
+## ATM-TCR as BAP
+The bap model is a stand-alone module that needs to be forked and configured before running the bap_attack. Here we take ATM-TCR for example.
+
+Step 1: 
+fork ATM-tcr from https://github.com/Lee-CBG/ATM-TCR at copy to the same level of bap_attack
+--root_dir
+  --bap_attack
+  --ATM-TCR
+
+Step 2: 
+configure conda environment and name as **atm-tcr** for subprocess running.
+dependencies:
+
+pytorch==1.5.0
+scikit-learn==1.3.2 
+numpy==1.24.4
+pandas==2.0.3
