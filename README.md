@@ -15,6 +15,15 @@ Reliable TCR-epitope binding prediction models are essential for development of 
 </p>
 
 
+## Publication
+<b>Iterative Attack-and-Defend Framework for Improving TCR-Epitope Binding Prediction Models </b> <br/>
+[Pengfei Zhang](https://github.com/pzhang84)<sup>1,2</sup>, Hao Mei<sup>1,2</sup>, [Seojin Bang](http://seojinb.com/)<sup>2</sup>, [Heewook Lee](https://scai.engineering.asu.edu/faculty/computer-science-and-engineering/heewook-lee/)<sup>1,2</sup><br/>
+<sup>1 </sup>School of Computing and Augmented Intelligence, Arizona State University, <sup>2 </sup>Biodesign Institute, Arizona State University <br/>
+Accepted in ISMB/ECCB, appeared in Bioinformatics proceedings.
+
+
+[Paper]([https://doi.org/10.7554/eLife.88837.1](https://academic.oup.com/bioinformatics/article/41/Supplement_1/i429/8199358)) | [Code](https://github.com/Lee-CBG/BAP_Attack_n_Defend) | [Poster]() | [Slides](#) 
+
 
 ## 📊 Main Results
 
