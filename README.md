@@ -17,12 +17,14 @@ Reliable TCR-epitope binding prediction models are essential for development of 
 
 ## Publication
 <b>Iterative Attack-and-Defend Framework for Improving TCR-Epitope Binding Prediction Models </b> <br/>
-[Pengfei Zhang](https://github.com/pzhang84)<sup>1,2</sup>, Hao Mei<sup>1,2</sup>, [Seojin Bang](http://seojinb.com/)<sup>2</sup>, [Heewook Lee](https://scai.engineering.asu.edu/faculty/computer-science-and-engineering/heewook-lee/)<sup>1,2</sup><br/>
-<sup>1 </sup>School of Computing and Augmented Intelligence, Arizona State University, <sup>2 </sup>Biodesign Institute, Arizona State University <br/>
-Accepted in ISMB/ECCB, appeared in Bioinformatics proceedings.
+[Pengfei Zhang](https://github.com/pzhang84)<sup>1,2</sup>, Hao Mei<sup>1,2</sup>, [Seojin Bang](http://seojinb.com/)<sup>3</sup>, [Heewook Lee](https://scai.engineering.asu.edu/faculty/computer-science-and-engineering/heewook-lee/)<sup>1</sup>  
+<sup>1</sup>School of Computing and Augmented Intelligence, Arizona State University, Tempe, AZ 85281  
+<sup>2</sup>Biodesign Institute, Arizona State University, Tempe, AZ 85281  
+<sup>3</sup>Google DeepMind, Mountain View, CA 94043  
+Accepted at **ISMB/ECCB 2025** and published in the **Bioinformatics Proceedings**.
 
 
-[Paper]([https://doi.org/10.7554/eLife.88837.1](https://academic.oup.com/bioinformatics/article/41/Supplement_1/i429/8199358)) | [Code](https://github.com/Lee-CBG/BAP_Attack_n_Defend) | [Poster]() | [Slides](#) 
+[Paper]([https://doi.org/10.7554/eLife.88837.1](https://academic.oup.com/bioinformatics/article/41/Supplement_1/i429/8199358)) | [Code](https://github.com/Lee-CBG/BAP_Attack_n_Defend) | [Poster]() | [Slides](https://docs.google.com/presentation/d/1ZJSgte9NFXbzEt2Jf2oWojRJgfqCnYdsM_-UFCZV6Hc/edit?usp=sharing) 
 
 
 ## 📊 Main Results
@@ -100,7 +102,15 @@ pip install pytorch==1.5.0 scikit-learn==1.3.2 numpy==1.24.4 pandas==2.0.3
 If you find **BAP Attack-n-Defend** useful for your research, please cite our work:
 
 ```
-@article{
+@article{zhang2025iterative,
+  title={Iterative attack-and-defend framework for improving TCR-epitope binding prediction models},
+  author={Zhang, Pengfei and Mei, Hao and Bang, Seojin and Lee, Heewook},
+  journal={Bioinformatics},
+  volume={41},
+  number={Supplement\_1},
+  pages={i429--i438},
+  year={2025},
+  publisher={Oxford University Press}
 }
 ```
 
