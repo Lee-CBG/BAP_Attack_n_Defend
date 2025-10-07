@@ -24,7 +24,7 @@ Reliable TCR-epitope binding prediction models are essential for development of 
 Accepted at **ISMB/ECCB 2025** and published in the **Bioinformatics Proceedings**.
 
 
-[Paper]([https://doi.org/10.7554/eLife.88837.1](https://academic.oup.com/bioinformatics/article/41/Supplement_1/i429/8199358)) | [Code](https://github.com/Lee-CBG/BAP_Attack_n_Defend) | [Poster]() | [Slides](https://docs.google.com/presentation/d/1ZJSgte9NFXbzEt2Jf2oWojRJgfqCnYdsM_-UFCZV6Hc/edit?usp=sharing) 
+[Paper]([https://doi.org/10.7554/eLife.88837.1](https://academic.oup.com/bioinformatics/article/41/Supplement_1/i429/8199358)) | [Code](https://github.com/Lee-CBG/BAP_Attack_n_Defend) | [Poster](https://github.com/Lee-CBG/BAP_Attack_n_Defend/blob/main/figures/Zhang_Pengfei_42x42.pdf) | [Slides](https://docs.google.com/presentation/d/1ZJSgte9NFXbzEt2Jf2oWojRJgfqCnYdsM_-UFCZV6Hc/edit?usp=sharing) 
 
 
 ## 📊 Main Results
